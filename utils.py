@@ -3,6 +3,7 @@ import pprint
 from ast import literal_eval
 import pandas as pd
 
+
 def load_metadata():
     server = "https://erddap.observations.voiceoftheocean.org/erddap"
     e = ERDDAP(
@@ -70,6 +71,28 @@ def load_metadata():
     metadata['time_coverage_end (UTC)'] = pd.to_datetime(metadata['time_coverage_end (UTC)'])
     metadata['time_coverage_start (UTC)'] = pd.to_datetime(metadata['time_coverage_start (UTC)'])
     return metadata
+
+
+def filter_metadata():
+    # actually, I think this function should return a filtered DataFrame and not a list of IDs
+    mode = 'all' # 'nrt', 'delayed'
+    metadata = load_metadata()
+    metadata = metadata[
+        (metadata['basin']=='Bornholm Basin') &
+        (metadata['time_coverage_start (UTC)'].dt.year==2022) &
+        (metadata['time_coverage_start (UTC)'].dt.month<3)
+        ]
+    metadata = drop_overlaps(metadata)
+    return metadata
+
+def add_delayed_dataset_ids(metadata):
+    nrt_dataset_ids = list(metadata.index)
+    delayed_dataset_ids = [
+        datasetid.replace('nrt', 'delayed') for datasetid in metadata.index]
+    all_dataset_ids = nrt_dataset_ids+delayed_dataset_ids
+    #import pdb; pdb.set_trace();
+    return all_dataset_ids#metadata.loc[all_dataset_ids]
+
 
 def drop_overlaps(metadata):
     drop_overlap=True
