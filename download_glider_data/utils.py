@@ -242,7 +242,7 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
             dataset_nc = cache_dir / f"{ds_name}.nc"
             if cached_dataset:
                 print(f"Found {ds_name} in {cache_dir}. Loading from disk")
-                ds = xr.open_dataset(dataset_nc)
+                ds = xr.open_mfdataset(dataset_nc)
                 if adcp:
                     ds = add_adcp_data(ds)
                 glider_datasets[ds_name] = ds
