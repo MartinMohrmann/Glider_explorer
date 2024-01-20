@@ -25,6 +25,7 @@ import utils
 ###### filter metadata to prepare download ##############
 metadata = utils.filter_metadata()
 all_dataset_ids = utils.add_delayed_dataset_ids(metadata) # hacky
+#import pdb; pdb.set_trace();
 
 ###### download actual data ##############################
 dutils.cache_dir = pathlib.Path('../voto_erddap_data_cache')
@@ -47,32 +48,36 @@ ropts = dict(
              )
 
 
-def create_single_ds_plot(data, metadata, variable, dsid, dynfontsize, x_sampling, y_sampling):
+def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
     # plot_options should be a dictionary
+
     text_annotation = hv.Text(
         x=metadata.loc[dsid]['time_coverage_start (UTC)'] ,
         y=-2, text=dsid.replace('nrt_', ''),
-        fontsize=dynfontsize,
+        fontsize=plt_props['dynfontsize'],
             ).opts(text_opts
             ).opts(**ropts)
 
     startvline = hv.VLine(metadata.loc[dsid]['time_coverage_start (UTC)']).opts(color='grey')
     endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey')
+
     datapoints = data.hvplot.scatter(
         x='time',
         y='depth',
         c=variable,
-        x_sampling=x_sampling,
-        y_sampling=y_sampling,
+        x_sampling=plt_props['x_sampling'],
+        y_sampling=plt_props['y_sampling'],
         flip_yaxis=True,
         dynamic=False,
         cmap=cmocean.cm.thermal,
         height=400,
         responsive=True,
+        #datashade=True,
         rasterize=True,
         cnorm=cnorm,
         #clim=clim,
         )
+    # print(plt_props['x_sampling'])
     return text_annotation*startvline*endvline*datapoints
 
 
@@ -80,65 +85,65 @@ def get_xsection(x_range, variable):
     (x0, x1) = x_range
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
-    nrtkeys = [item for item in dsdict.keys() if item[0:3]=='nrt']
-    meta = metadata.loc[nrtkeys]
-    # plot options should be a dictioary
-    if (x1-x0)>np.timedelta64(180, 'D'):
-        # grid timeline into n sections
-        x_sampling = int(dtns/1000)
-        # activate sparse data mode to speed up reactivity
-        zoomed_out = True
-        #x_sampling=8.64e13 # daily
-        y_sampling=1
-    else:
-        # load delayed mode datasets for more detail
-        delayedkeys = [item for item in dsdict.keys() if item[0:7]=='delayed']
-        meta = metadata.loc[nrtkeys]
-        zoomed_out = False
-        x_sampling=8.64e13/24
-        y_sampling=0.2
-
-    meta = meta[
+    #import pdb; pdb.set_trace()
+    #nrtkeys = [item for item in dsdict.keys() if item[0:3]=='nrt']
+    #meta = metadata.loc[nrtkeys]
+    plt_props = {}
+    #delayedkeys = [item for item in dsdict.keys() if item[0:7]=='delayed']
+    #nrtkeys =  [item for item in dsdict.keys() if item[0:3]=='nrt']
+    meta = metadata[
             # x0 and x1 are the time start and end of our view, the other times
             # are the start and end of the individual datasets. To increase
             # perfomance, datasets are loaded only if visible, so if
             # 1. it starts within our view...
-            ((pd.to_datetime(meta['time_coverage_start (UTC)'].dt.date)>=x0) &
-            (pd.to_datetime(meta['time_coverage_start (UTC)'].dt.date)<=x1)) |
+            ((pd.to_datetime(metadata['time_coverage_start (UTC)'].dt.date)>=x0) &
+            (pd.to_datetime(metadata['time_coverage_start (UTC)'].dt.date)<=x1)) |
             # 2. it ends within our view...
-            ((pd.to_datetime(meta['time_coverage_end (UTC)'].dt.date)>=x0) &
-            (pd.to_datetime(meta['time_coverage_end (UTC)'].dt.date)<=x1)) |
+            ((pd.to_datetime(metadata['time_coverage_end (UTC)'].dt.date)>=x0) &
+            (pd.to_datetime(metadata['time_coverage_end (UTC)'].dt.date)<=x1)) |
             # 3. it starts before and ends after our view (zoomed in)...
-            ((pd.to_datetime(meta['time_coverage_start (UTC)'].dt.date)<=x0) &
-            (pd.to_datetime(meta['time_coverage_end (UTC)'].dt.date)>=x1)) |
+            ((pd.to_datetime(metadata['time_coverage_start (UTC)'].dt.date)<=x0) &
+            (pd.to_datetime(metadata['time_coverage_end (UTC)'].dt.date)>=x1)) |
             # 4. or it both, starts and ends within our view (zoomed out)...
-            ((pd.to_datetime(meta['time_coverage_start (UTC)'].dt.date)>=x0) &
-            (pd.to_datetime(meta['time_coverage_end (UTC)'].dt.date)<=x1))
+            ((pd.to_datetime(metadata['time_coverage_start (UTC)'].dt.date)>=x0) &
+            (pd.to_datetime(metadata['time_coverage_end (UTC)'].dt.date)<=x1))
             ]
-    if zoomed_out:
-        print([element for element in list(metadata.index)])
-        dynfontsize=4
-    else:
-        print([element.replace('nrt', 'delayed') for element in list(metadata.index)])
-        dynfontsize=10
-    plotslist = []
-    # note: only the first plot in the list needs the **ropts. Everything else might be overwritten
-    print(variable)
-    print(cnorm)
-    for dsid in meta.index:
-        if zoomed_out:
-            data=dsdict[dsid]
-        else:
-            data=dsdict[dsid.replace('nrt', 'delayed')]
+    zoomed_out = False
+    # grid timeline into n sections
+    plt_props['x_sampling'] = int(dtns/1000) # effective horizontal resolution (px)
+    plt_props['y_sampling']=.2
+    plt_props['dynfontsize']=4
 
-        ############### I need metadata, dynfontsize, data ##############
-        single_plot = create_single_ds_plot(data, metadata, variable, dsid, dynfontsize, x_sampling, y_sampling)
+    """
+    if (x1-x0)>np.timedelta64(180, 'D'):
+        # activate sparse data mode to speed up reactivity
+        zoomed_out = True
+        #x_sampling=8.64e13 # daily
+        # grid timeline into n sections
+        plt_props['x_sampling'] = int(dtns/1000)
+        plt_props['y_sampling']=1
+        plt_props['dynfontsize']=4
+    else:
+        # load delayed mode datasets for more detail
+        zoomed_out = False
+        plt_props['x_sampling']=8.64e13/24
+        plt_props['y_sampling']=0.2
+        plt_props['dynfontsize']=10
+    """
+
+
+    plotslist = []
+    # note: only the first plot in the list needs the **ropts. Everything else migh
+    for dsid in meta.index:
+        data=dsdict[dsid] if zoomed_out else dsdict[dsid.replace('nrt', 'delayed')]
+        single_plot = create_single_ds_plot(data, metadata, variable, dsid, plt_props)
         plotslist.append(single_plot)
     return reduce(lambda x, y: x*y, plotslist)
 
-
-x_range=('2022-01-15', '2022-12-17')
-range_stream = RangeX(x_range=(np.datetime64(x_range[0]), np.datetime64(x_range[1])))
+# on initial load, show all data
+x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
+         metadata['time_coverage_end (UTC)'].max().to_datetime64())
+range_stream = RangeX(x_range=x_range)
 
 variable_widget = pn.widgets.Select(
     name="icnorm",
@@ -151,8 +156,7 @@ def create_dynmap(icnorm):
     cnorm = variable_widget.value
     dmap = hv.DynamicMap(get_xsection,
     kdims=['variable'],#, 'cnorm'],
-    streams=[range_stream],
-    )
+    streams=[range_stream],)
     return dmap.redim.values(
         variable=('temperature', 'salinity'))
 
@@ -168,5 +172,6 @@ Future development ideas:
 * activate hover
 * holoviews autoupdate for development
 * write tests including timings benchmark for development
+* implement async functionen documented in holoviews to not disturb user interaction
 ...
 """
