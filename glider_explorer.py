@@ -18,6 +18,11 @@ import param
 # import hvplot.pandas
 # import cudf # works w. cuda, but slow.
 # import hvplot.cudf
+# import holoviews as hv
+import datashader as dsh
+from holoviews.operation.datashader import datashade, rasterize, shade, dynspread, spread
+
+
 
 from download_glider_data import utils as dutils
 import utils
@@ -50,7 +55,7 @@ ropts = dict(
 
 def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
     # plot_options should be a dictionary
-
+    #import pdb; pdb.set_trace()
     text_annotation = hv.Text(
         x=metadata.loc[dsid]['time_coverage_start (UTC)'] ,
         y=-2, text=dsid.replace('nrt_', ''),
@@ -60,8 +65,10 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
 
     startvline = hv.VLine(metadata.loc[dsid]['time_coverage_start (UTC)']).opts(color='grey')
     endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey')
+    print(plt_props)
 
-    datapoints = data.hvplot.scatter(
+    """
+    raster = data.hvplot.scatter(
         x='time',
         y='depth',
         c=variable,
@@ -75,10 +82,26 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
         #datashade=True,
         rasterize=True,
         cnorm=cnorm,
+
         #clim=clim,
         )
-    # print(plt_props['x_sampling'])
-    return text_annotation*startvline*endvline*datapoints
+    """
+    """
+    means = dsh.mean(variable)
+    points = hv.Points(data, ['time', 'depth'])
+    raster = rasterize(points,
+                  aggregator=means,
+                  cmap=cmocean.cm.thermal,
+                  #interpolation='bilinear',
+                  #dynamic=False,
+                  datashade=True,
+                  #x_sampling=1,#4e12,
+                  #y_sampling=0.2,
+                  cnorm='eq_hist').opts(invert_yaxis=True)#.opts(**ropts)
+
+    return points
+    """
+    return text_annotation*startvline*endvline#*raster
 
 
 def get_xsection(x_range, variable):
@@ -110,11 +133,12 @@ def get_xsection(x_range, variable):
             ]
     zoomed_out = False
     # grid timeline into n sections
-    plt_props['x_sampling'] = int(dtns/1000) # effective horizontal resolution (px)
-    plt_props['y_sampling']=.2
-    plt_props['dynfontsize']=4
+    #plt_props['x_sampling'] = int(dtns/1000) # effective horizontal resolution (px)
+    #plt_props['y_sampling']=.2
+    #plt_props['dynfontsize']=4
+    #plt_props['x_sampling']=8.64e13/240
 
-    """
+    zoomed_in = False
     if (x1-x0)>np.timedelta64(180, 'D'):
         # activate sparse data mode to speed up reactivity
         zoomed_out = True
@@ -123,19 +147,29 @@ def get_xsection(x_range, variable):
         plt_props['x_sampling'] = int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
+    elif (x1-x0)<np.timedelta64(1, 'D'):
+        # activate sparse data mode to speed up reactivity
+        zoomed_in = True
+        #variable='temperatu'
+        #x_sampling=8.64e13 # daily
+        # grid timeline into n sections
+        plt_props['x_sampling'] = 1#int(dtns/10000)
+        plt_props['y_sampling']=0.1
+        plt_props['dynfontsize']=4
     else:
         # load delayed mode datasets for more detail
         zoomed_out = False
         plt_props['x_sampling']=8.64e13/24
         plt_props['y_sampling']=0.2
         plt_props['dynfontsize']=10
-    """
-
 
     plotslist = []
     # note: only the first plot in the list needs the **ropts. Everything else migh
     for dsid in meta.index:
         data=dsdict[dsid] if zoomed_out else dsdict[dsid.replace('nrt', 'delayed')]
+        data = data.isel(time=slice(0,-1,10), drop=True)#data.to_dask_dataframe().sample(0.1)
+        #data = data.drop
+        #import pdb; pdb.set_trace()
         single_plot = create_single_ds_plot(data, metadata, variable, dsid, plt_props)
         plotslist.append(single_plot)
     return reduce(lambda x, y: x*y, plotslist)
@@ -160,12 +194,43 @@ def create_dynmap(icnorm):
     return dmap.redim.values(
         variable=('temperature', 'salinity'))
 
+plotslist2 = []
+for dsid in metadata.index:
+    data=dsdict[dsid.replace('nrt', 'delayed')]
+    #data = data.isel(time=slice(0,-1,10), drop=True)#data.to_dask_dataframe().sample(0.1)
+    #data = data.drop
+    #import pdb; pdb.set_trace()
+    #single_plot = create_single_ds_plot(data, metadata, variable, dsid, plt_props)
+    plt_props = {}
+    plt_props['x_sampling']=8.64e13/24
+    plt_props['y_sampling']=0.2
+    plt_props['dynfontsize']=10
+    raster = data.hvplot.scatter(
+        x='time',
+        y='depth',
+        c='temperature',
+        #x_sampling=plt_props['x_sampling'],
+        #y_sampling=plt_props['y_sampling'],
+        flip_yaxis=True,
+        #dynamic=False,
+        cmap=cmocean.cm.thermal,
+        height=400,
+        responsive=True,
+        #datashade=True,
+        rasterize=True,
+        #cnorm=cnorm,
+        #clim=clim,
+        )
+    plotslist2.append(raster)
+plotslist2 = reduce(lambda x, y: x*y, plotslist2)
+
 # one solution to the reset problem could be to change global values, e.g. set variable to "selected temperature" globally
 dmap = pn.bind(
         create_dynmap,
         icnorm=variable_widget)
 
-pn.Column(variable_widget,dmap).show(port=12345)
+pn.Column(plotslist2*create_dynmap('linear')).show(port=12345)
+#pn.Column(variable_widget,dmap).show(port=12345)
 
 """
 Future development ideas:
@@ -173,5 +238,6 @@ Future development ideas:
 * holoviews autoupdate for development
 * write tests including timings benchmark for development
 * implement async functionen documented in holoviews to not disturb user interaction
+* throw out X_range_stream (possibly) and implement full data dynamic sampling instead. One solution could be to use a dynamic .sample(frac=zoomstufe)
 ...
 """
