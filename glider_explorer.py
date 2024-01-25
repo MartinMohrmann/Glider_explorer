@@ -229,6 +229,8 @@ def get_xsection(x_range):
 
 
 def get_xsection_raster(x_range, variable):
+    global plotvar
+    plotvar = variable
     (x0, x1) = x_range
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
@@ -320,6 +322,7 @@ def create_dynmap(icnorm):
     # Change of global variables because range_stream does
     # not seem to work with passing variables (how?, why?)
     global cnorm
+    #global variable
     cnorm = variable_widget.value
     dmap = hv.DynamicMap(get_xsection,
     #kdims=['variable'],#, 'cnorm'],
@@ -327,55 +330,27 @@ def create_dynmap(icnorm):
     dmap_raster = hv.DynamicMap(get_xsection_raster,
     kdims=['variable'],#, 'cnorm'],
     streams=[range_stream],)
+    #import pdb; pdb.set_trace()
+
     return dmap, dmap_raster#.redim.values(
         #variable=('temperature', 'salinity'))
 
-"""
-plotslist2 = []
-for dsid in metadata.index:
-    data=dsdict[dsid.replace('nrt', 'delayed')]
-    #data = data.isel(time=slice(0,-1,10), drop=True)#data.to_dask_dataframe().sample(0.1)
-    #data = data.drop
-    #import pdb; pdb.set_trace()
-    #single_plot = create_single_ds_plot(data, metadata, variable, dsid, plt_props)
-    plt_props = {}
-    plt_props['x_sampling']=8.64e13/24
-    plt_props['y_sampling']=0.2
-    plt_props['dynfontsize']=10
-    raster = data.hvplot.scatter(
-        x='time',
-        y='depth',
-        c='temperature',
-        #x_sampling=plt_props['x_sampling'],
-        #y_sampling=plt_props['y_sampling'],
-        flip_yaxis=True,
-        #dynamic=False,
-        cmap=cmocean.cm.thermal,
-        height=400,
-        responsive=True,
-        #datashade=True,
-        rasterize=True,
-        #cnorm=cnorm,
-        #clim=clim,
-        )
-    plotslist2.append(raster)
-plotslist2 = reduce(lambda x, y: x*y, plotslist2)
-"""
-
-
 # one solution to the reset problem could be to change global values, e.g. set variable to "selected temperature" globally
-#dmap = pn.bind(
-#        create_dynmap,
-#        icnorm=variable_widget)
+dmap = pn.bind(
+        create_dynmap,
+        icnorm=variable_widget)
 
 #import pdb; pdb.set_trace()
 #pn.Column(plotslist2*create_dynmap('linear')).show(port=12345)
 dmap, dmap_raster = create_dynmap('linear')
 dmap_raster = dmap_raster.redim.values(
         variable=('temperature', 'salinity'))
-means = dsh.mean('temperature')
+means = dsh.mean(dmap_raster.current_key)
+import pdb; pdb.set_trace()
 #pn.Column((rasterize(dmap_raster, aggregator=means)*dmap).opts(**ropts)).show(port=12345)
-pn.Column(rasterize(dmap_raster, aggregator=means).opts(
+pn.Column(rasterize(dmap_raster,
+                    aggregator=means,
+                    ).opts(
              invert_yaxis=True,
              colorbar=True,
              cmap=cmocean.cm.thermal,
@@ -384,7 +359,7 @@ pn.Column(rasterize(dmap_raster, aggregator=means).opts(
              responsive=True,
              height=400,
              active_tools=['xpan', 'xwheel_zoom'],
-             bgcolor="dimgrey",).opts(**ropts)).show(port=12345)
+             bgcolor="dimgrey",).opts(**ropts)*dmap).show(port=12345)
 #pn.Column(variable_widget,dmap).show(port=12345)
 
 """
