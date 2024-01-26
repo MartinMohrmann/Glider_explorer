@@ -67,7 +67,7 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
     endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey')
     print(plt_props)
 
-
+    """
     raster = data.hvplot.scatter(
         x='time',
         y='depth',
@@ -82,11 +82,10 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
         #datashade=True,
         rasterize=True,
         cnorm=cnorm,
-
         #clim=clim,
         )
 
-    """
+
     means = dsh.mean(variable)
     points = hv.Points(data, ['time', 'depth'])
     raster = rasterize(points,
@@ -119,10 +118,12 @@ def create_single_ds_plot_raster(data, metadata, variable, plt_props):
     print(plt_props)
 
     """
+    #means = dsh.mean(variable)
     raster = data.hvplot.scatter(
         x='time',
         y='depth',
-        c=variable,
+        c='cplotvar',
+        #aggregator=means,
         #x_sampling=plt_props['x_sampling'],
         #y_sampling=plt_props['y_sampling'],
         #flip_yaxis=True,
@@ -229,8 +230,8 @@ def get_xsection(x_range):
 
 
 def get_xsection_raster(x_range, variable):
-    global plotvar
-    plotvar = variable
+    #global plotvar
+    #lotvar = variable
     (x0, x1) = x_range
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
@@ -290,8 +291,9 @@ def get_xsection_raster(x_range, variable):
         plt_props['dynfontsize']=10
 
     plotslist = []
-    varlist = [dsdict[dsid.replace('nrt', 'delayed')][['time', 'depth', 'temperature']] for dsid in meta.index]
+    varlist = [dsdict[dsid.replace('nrt', 'delayed')][['time', 'depth', 'temperature', 'salinity']] for dsid in meta.index]
     dsconc = xarray.concat(varlist, dim='time')
+    dsconc['cplotvar'] = dsconc[variable]
     mplt = create_single_ds_plot_raster(dsconc, metadata, variable, plt_props)
     # note: only the first plot in the list needs the **ropts. Everything else migh
     #for dsid in meta.index:
@@ -302,7 +304,8 @@ def get_xsection_raster(x_range, variable):
         #import pdb; pdb.set_trace()
         #single_plot = create_single_ds_plot_raster(data, metadata, variable, dsid, plt_props)
         #plotslist.append(single_plot)
-    return mplt#reduce(lambda x, y: x*y, plotslist)
+    #agg = dsh.mean('temperature')
+    return mplt#, agg#reduce(lambda x, y: x*y, plotslist)
 
 
 
@@ -327,29 +330,25 @@ def create_dynmap(icnorm):
     dmap = hv.DynamicMap(get_xsection,
     #kdims=['variable'],#, 'cnorm'],
     streams=[range_stream],)
+    #import pdb; pdb.set_trace();
     dmap_raster = hv.DynamicMap(get_xsection_raster,
     kdims=['variable'],#, 'cnorm'],
     streams=[range_stream],)
-    #import pdb; pdb.set_trace()
-
-    return dmap, dmap_raster#.redim.values(
-        #variable=('temperature', 'salinity'))
+    return (dmap, dmap_raster)
 
 # one solution to the reset problem could be to change global values, e.g. set variable to "selected temperature" globally
-dmap = pn.bind(
-        create_dynmap,
-        icnorm=variable_widget)
 
-#import pdb; pdb.set_trace()
-#pn.Column(plotslist2*create_dynmap('linear')).show(port=12345)
+
 dmap, dmap_raster = create_dynmap('linear')
+#blubbtuple = pn.bind(
+#    create_dynmap,#('linear')
+#    icnorm=variable_widget)
+#dmap, dmap_raster = blubbtuple
 dmap_raster = dmap_raster.redim.values(
         variable=('temperature', 'salinity'))
-means = dsh.mean(dmap_raster.current_key)
-import pdb; pdb.set_trace()
-#pn.Column((rasterize(dmap_raster, aggregator=means)*dmap).opts(**ropts)).show(port=12345)
-pn.Column(rasterize(dmap_raster,
-                    aggregator=means,
+means = dsh.mean('cplotvar')
+dmap_raster = rasterize(dmap_raster,
+                    aggregator=means,#'mean',
                     ).opts(
              invert_yaxis=True,
              colorbar=True,
@@ -359,12 +358,16 @@ pn.Column(rasterize(dmap_raster,
              responsive=True,
              height=400,
              active_tools=['xpan', 'xwheel_zoom'],
-             bgcolor="dimgrey",).opts(**ropts)*dmap).show(port=12345)
-#pn.Column(variable_widget,dmap).show(port=12345)
+             bgcolor="dimgrey",).opts(**ropts)
+#dmap_combined = dmap*dmap_raster
+#dmap_combined = pn.bind(
+#        create_dynmap,
+#        icnorm=variable_widget)
+pn.Column(dmap_raster*dmap).show(port=12345)
 
 """
 Future development ideas:
-* activate hover
+* activate hover (for example dataset details, sensor specs, or point details)
 * holoviews autoupdate for development
 * write tests including timings benchmark for development
 * implement async functionen documented in holoviews to not disturb user interaction
