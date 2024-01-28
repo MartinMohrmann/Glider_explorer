@@ -129,9 +129,9 @@ def _cached_dataset_exists(ds_id, request):
     else:
         print(f"no cache record found for {ds_id}")
         return False
-    if not stats["request"] == request:
-        print(f"request has changed for {ds_id}")
-        return False
+    #if not stats["request"] == request:
+    #    print(f"request has changed for {ds_id}")
+    #    return False
 
     #nc_time = pd.to_datetime(stats["date_created"])
     #meta = get_meta(ds_id)
@@ -235,7 +235,7 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
     # Download each dataset as xarray
     glider_datasets = {}
     for ds_name in ids_to_download:
-        if cache_datasets and "delayed" in ds_name: # and "delayed" in ds_name
+        if cache_datasets:# and "delayed" in ds_name: # and "delayed" in ds_name
             e.dataset_id = ds_name
             request = e.get_download_url()
             cached_dataset = _cached_dataset_exists(ds_name, request)
