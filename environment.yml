@@ -1,0 +1,17 @@
+name: glider_explorer
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - xarray
+  - glidertools
+  - hvplot
+  - cmocean
+  - holoviews
+  - pathlib
+  - pandas
+  - datashader
+  - holoviews
+  - numpy
+  - panel
+  - erdappy

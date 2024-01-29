@@ -23,7 +23,7 @@ import utils
 
 ###### filter metadata to prepare download ##############
 metadata = utils.filter_metadata()
-metadata = metadata.drop('nrt_SEA067_M15')
+metadata = metadata.drop('nrt_SEA067_M15', errors='ignore')
 
 all_dataset_ids = utils.add_delayed_dataset_ids(metadata) # hacky
 #import pdb; pdb.set_trace();
@@ -49,7 +49,7 @@ ropts = dict(
              default_tools=[],
              active_tools=['xpan', 'xwheel_zoom'],
              bgcolor="dimgrey",
-             )
+             ylim=(-5, None))
 
 
 def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
@@ -60,8 +60,8 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
             ).opts(text_opts
             ).opts(**ropts)
 
-    startvline = hv.VLine(metadata.loc[dsid]['time_coverage_start (UTC)']).opts(color='grey')
-    endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey')
+    startvline = hv.VLine(metadata.loc[dsid]['time_coverage_start (UTC)']).opts(color='grey', line_width=1)
+    endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey', line_width=1)
     # print(plt_props)
     return text_annotation*startvline*endvline
 
@@ -115,7 +115,7 @@ def load_viewport_datasets(x_range, metadata):
         plt_props['x_sampling'] = int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=50
+        plt_props['subsample_freq']=5
     elif (x1-x0)<np.timedelta64(1, 'D'):
         # activate sparse data mode to speed up reactivity
         zoomed_in = True
@@ -187,14 +187,17 @@ variable_widget = pn.widgets.Select(
 def myrasterize(cnormvalue,dmap_raster, dmap):
     dmap_rasterized = rasterize(dmap_raster,
                 aggregator=means,
+                x_sampling=8.64e13/12,
                 ).opts(
         invert_yaxis=True,
         colorbar=True,
         cmap=cmocean.cm.thermal,
         toolbar='above', tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
         default_tools=[],
-        responsive=True,
-        height=800,
+        #responsive=True,
+        #x_sampling=8.64e13/12,
+        width=800,
+        height=400,
         cnorm=cnormvalue,
         active_tools=['xpan', 'xwheel_zoom'],
         bgcolor="dimgrey",).opts(**ropts)
@@ -208,7 +211,10 @@ dmap_rasterized = pn.bind(
     dmap_raster,
     dmap)
 
-pn.Column(variable_widget, dmap_rasterized).show(port=12345)
+pn.Column(variable_widget, dmap_rasterized).show(
+    title='VOTO SAMBA data',
+    websocket_origin='*',
+    port=12345)
 
 """
 Future development ideas:
