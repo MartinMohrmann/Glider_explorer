@@ -1,18 +1,20 @@
+import cmocean.cm
+
 cmap_dict = dict(
-    conservative_temperature=cmo.thermal,
-    potential_density=cmo.dense,
-    temperature=cmo.thermal,
-    salinity=cmo.haline,
-    backscatter=cmo.turbid,
-    cdom=cmo.matter,
-    fdom=cmo.haline,
-    chlorophyll=cmo.algae,
-    oxygen_concentration=cmo.amp,
-    N2=cmo.balance,  # cmo.amp,
-    spice=cmo.matter,
-    temperature_oxygen=cmo.thermal,
-    turbidity=cmo.turbid,
-    profile_num=cmo.haline,
-    methane_concentration=cmo.thermal,
-    methane_raw_concentration=cmo.thermal
+    conservative_temperature=cmocean.cm.thermal,
+    potential_density=cmocean.cm.dense,
+    temperature=cmocean.cm.thermal,
+    salinity=cmocean.cm.haline,
+    backscatter=cmocean.cm.turbid,
+    cdom=cmocean.cm.matter,
+    fdom=cmocean.cm.haline,
+    chlorophyll=cmocean.cm.algae,
+    oxygen_concentration=cmocean.cm.amp,
+    N2=cmocean.cm.balance,  # cmocean.cm.amp,
+    spice=cmocean.cm.matter,
+    temperature_oxygen=cmocean.cm.thermal,
+    turbidity=cmocean.cm.turbid,
+    profile_num=cmocean.cm.haline,
+    methane_concentration=cmocean.cm.thermal,
+    methane_raw_concentration=cmocean.cm.thermal
 )

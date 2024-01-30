@@ -8,13 +8,14 @@ import pathlib
 import pandas as pd
 import datashader as dsh
 from holoviews.operation.datashader import datashade, rasterize, shade, dynspread, spread
-from holoviews.streams import RangeX
+from holoviews.streams import RangeX, param
 import numpy as np
 from functools import reduce
 import panel as pn
 
 from download_glider_data import utils as dutils
 import utils
+import dictionaries
 
 # unused imports
 # import hvplot.pandas
@@ -29,8 +30,8 @@ all_dataset_ids = utils.add_delayed_dataset_ids(metadata) # hacky
 #import pdb; pdb.set_trace();
 #all_dataset_ids.remove('nrt_SEA067_M15')
 #all_dataset_ids.remove('delayed_SEA067_M15') #!!!!!!!!!!!!!!!!!!!!!S
-
-
+#checkbox = pn.widgets.Checkbox(name='Logscale', value=True)
+#select = pn.widgets.Select(name='Select', options=[cmocean.cm.thermal, cmocean.cm.haline])
 ###### download actual data ##############################
 dutils.cache_dir = pathlib.Path('../voto_erddap_data_cache')
 variables=['temperature', 'salinity', 'depth',
@@ -49,8 +50,31 @@ ropts = dict(
              default_tools=[],
              active_tools=['xpan', 'xwheel_zoom'],
              bgcolor="dimgrey",
-             ylim=(-5, None))
+             #ylim=(-5, None),
+             #autorange='y',
+             ylim=(-5,None)
+             #autorange='y',
+            )
 
+def plot_limits(plot, element):
+    plot.handles['x_range'].min_interval = np.timedelta64(2, 'h')
+    plot.handles['x_range'].max_interval = np.timedelta64(int(5*3.15e7), 's') # 5 years
+    plot.handles['y_range'].min_interval = 10
+    plot.handles['y_range'].max_interval = 500
+    #plot.handles['x_range'].start = np.datetime64('2020-01-01')
+    #plot.handles['x_range'].end = np.datetime64('2026-01-01')
+    #plot.handles['y_range'].start = -10
+    #plot.handles['y_range'].end = 500
+
+
+x_min_global = np.datetime64('2020-01-01')
+x_max_global = np.datetime64('2024-01-01')
+
+#class Style(param.Parameterized):
+#    # could be expanded and take other parameter if it works
+#    colormap = param.ObjectSelector(
+#        default=cmocean.cm.thermal,
+#        objects=[cmocean.cm.thermal, cmocean.cm.haline])
 
 def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
     text_annotation = hv.Text(
@@ -60,8 +84,10 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
             ).opts(text_opts
             ).opts(**ropts)
 
-    startvline = hv.VLine(metadata.loc[dsid]['time_coverage_start (UTC)']).opts(color='grey', line_width=1)
-    endvline = hv.VLine(metadata.loc[dsid]['time_coverage_end (UTC)']).opts(color='grey', line_width=1)
+    startvline = hv.VLine(metadata.loc[dsid][
+        'time_coverage_start (UTC)']).opts(color='grey', line_width=1)
+    endvline = hv.VLine(metadata.loc[dsid][
+        'time_coverage_end (UTC)']).opts(color='grey', line_width=1)
     # print(plt_props)
     return text_annotation*startvline*endvline
 
@@ -74,7 +100,7 @@ def create_single_ds_plot_raster(
         x='time',
         y='depth',
         c='cplotvar',
-        cmap=cmocean.cm.thermal,
+        #cmap=cmocean.cm.thermal,
         cnorm=cnorm,
         )
     return raster
@@ -82,6 +108,11 @@ def create_single_ds_plot_raster(
 
 def load_viewport_datasets(x_range, metadata):
     (x0, x1) = x_range
+    global x_min_global
+    global x_max_global
+    x_min_global = x0
+    x_max_global = x1
+    print(x_range, x_min_global, x_max_global)
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
     plt_props = {}
@@ -143,7 +174,8 @@ def get_xsection(x_range):
     for dsid in meta.index:
         #data=dsdict[dsid] if zoomed_out else dsdict[dsid.replace('nrt', 'delayed')]
         data=dsdict[dsid.replace('nrt', 'delayed')]
-        single_plot = create_single_ds_plot(data, metadata, variable, dsid, plt_props)
+        single_plot = create_single_ds_plot(
+            data, metadata, variable, dsid, plt_props)
         plotslist.append(single_plot)
     return reduce(lambda x, y: x*y, plotslist)
 
@@ -155,9 +187,12 @@ def get_xsection_raster(x_range, variable, cnorm):
         ['time', 'depth', 'temperature', 'salinity']] for dsid in meta.index]
     dsconc = xarray.concat(varlist, dim='time')
     dsconc['cplotvar'] = dsconc[variable]
-    dsconc = dsconc.isel(time=slice(0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
+    dsconc = dsconc.isel(time=slice(
+        0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
     mplt = create_single_ds_plot_raster(cnorm=cnorm, data=dsconc)
-    return mplt
+    # global combined
+    # mplt = combined.apply.opts(cmap=dictionaries.cmap_dict['temperature'])
+    return mplt#, combined
 
 # on initial load, show all data
 x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
@@ -169,7 +204,7 @@ def create_dynmap():
     # not seem to work with passing variables (how?, why?)
 
     dmap = hv.DynamicMap(get_xsection,
-    streams=[range_stream],)
+    streams=[range_stream],).opts(hooks=[plot_limits])
     dmap_raster = hv.DynamicMap(get_xsection_raster,
     kdims=['variable', 'cnorm'],
     streams=[range_stream],).redim.values(
@@ -177,44 +212,60 @@ def create_dynmap():
         cnorm=('linear', 'eq_hist'))
     return dmap_raster, dmap
 
-
+# style = Style()
 means = dsh.mean('cplotvar')
 dmap_raster, dmap = create_dynmap()
 variable_widget = pn.widgets.Select(
     name="icnorm",
     value="linear", options=['linear', 'eq_hist'])
 
+
 def myrasterize(cnormvalue,dmap_raster, dmap):
+    # global dmap_rasterized
     dmap_rasterized = rasterize(dmap_raster,
                 aggregator=means,
-                x_sampling=8.64e13/12,
+                x_sampling=8.64e13/48,
                 ).opts(
         invert_yaxis=True,
         colorbar=True,
-        cmap=cmocean.cm.thermal,
-        toolbar='above', tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
+        cmap=cmocean.cm.thermal,#,cmap
+        toolbar='above',
+        tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
         default_tools=[],
         #responsive=True,
-        #x_sampling=8.64e13/12,
         width=800,
         height=400,
         cnorm=cnormvalue,
         active_tools=['xpan', 'xwheel_zoom'],
-        bgcolor="dimgrey",).opts(**ropts)
-    return dmap_rasterized*dmap
+        bgcolor="dimgrey",)#.opts(**ropts,hooks=[plot_limits])
+
+    #dmap_rasterized = dmap_rasterized.apply.opts(cmap=[dictionaries.cmap_dict['salinity'], dictionaries.cmap_dict['temperature']])
+    combined = dmap_rasterized.apply.opts(cmap=dictionaries.cmap_dict['salinity'])
+    combined = dmap_rasterized*dmap
+    combined.opts(xlim=(x_min_global, x_max_global))
+    return combined
 
 # Here I could implement if I want a (spread-) scatterplot if zoomed in a lot.
 # That could be shade instead of rasterize I believe? Or datashade? and then spread.
-dmap_rasterized = pn.bind(
+# combined = myrasterize('linear', dmap_raster, dmap)#.redim.values(cnorm=select)
+
+
+#mholomap = hv.HoloMap(dmap_raster)
+#pn.Column(select, variable_widget, combined).show(port=12345)
+
+
+dmap_rasterized_bound = pn.bind(
     myrasterize,
     variable_widget,
     dmap_raster,
     dmap)
 
-pn.Column(variable_widget, dmap_rasterized).show(
+
+pn.Column(variable_widget, dmap_rasterized_bound).show(
     title='VOTO SAMBA data',
     websocket_origin='*',
     port=12345)
+
 
 """
 Future development ideas:
