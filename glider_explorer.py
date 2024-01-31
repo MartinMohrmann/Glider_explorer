@@ -8,7 +8,7 @@ import pathlib
 import pandas as pd
 import datashader as dsh
 from holoviews.operation.datashader import datashade, rasterize, shade, dynspread, spread
-from holoviews.streams import RangeX, param
+from holoviews.streams import RangeX
 import numpy as np
 from functools import reduce
 import panel as pn
@@ -22,10 +22,6 @@ import dictionaries
 # import hvplot.pandas
 # import cudf # works w. cuda, but slow.
 # import hvplot.cudf
-
-x_min_global = np.datetime64('2022-01-01')
-x_max_global = np.datetime64('2024-01-01')
-
 
 ###### filter metadata to prepare download ##############
 metadata = utils.filter_metadata()
@@ -42,9 +38,8 @@ dsdict = dutils.download_glider_dataset(dataset_ids=all_dataset_ids,
                                         variables=variables)
 
 ####### specify global plot variables ####################
-#clim = tuple([0,20])#df.temperature.quantile([0.02, 0.98]).values) # beware, probably not global!
 #df.index = cudf.to_datetime(df.index)
-text_opts  = hv.opts.Text(text_align='left', text_color='gray')
+text_opts  = hv.opts.Text(text_align='left', text_color='black') #OOOOOOOOOOOOOOO
 ropts = dict(
              toolbar='above', tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
              default_tools=[],
@@ -59,50 +54,32 @@ def plot_limits(plot, element):
     plot.handles['y_range'].min_interval = 10
     plot.handles['y_range'].max_interval = 500
 
-#class Style(param.Parameterized):
-#    # could be expanded and take other parameter if it works
-#    colormap = param.ObjectSelector(
-#        default=cmocean.cm.thermal,
-#        objects=[cmocean.cm.thermal, cmocean.cm.haline])
-
 def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
     text_annotation = hv.Text(
         x=metadata.loc[dsid]['time_coverage_start (UTC)'] ,
         y=-2, text=dsid.replace('nrt_', ''),
         fontsize=plt_props['dynfontsize'],
-            ).opts(text_opts
-            ).opts(**ropts)
+            ).opts(**ropts).opts(text_opts)
 
     startvline = hv.VLine(metadata.loc[dsid][
         'time_coverage_start (UTC)']).opts(color='grey', line_width=1)
     endvline = hv.VLine(metadata.loc[dsid][
         'time_coverage_end (UTC)']).opts(color='grey', line_width=1)
-    # print(plt_props)
     return text_annotation*startvline*endvline
 
 
 def create_single_ds_plot_raster(
         data):
-    #print('cnorm in create_single_ds_plot_raster is', cnorm)
     raster = data.hvplot.scatter(
         x='time',
         y='depth',
         c='cplotvar',
-        #cmap=cmocean.cm.thermal,
-        #cnorm=cnorm,
         )
-    #mraster = myrasterize(cnormvalue='linear', dmap_raster=raster)
     return raster
 
 
-def load_viewport_datasets(x_range, metadata):
+def load_viewport_datasets(x_range):
     (x0, x1) = x_range
-    print('load_viewport_datasets:', x_range)
-    global x_min_global
-    global x_max_global
-    x_min_global = x0
-    x_max_global = x1
-    #print(x_range, x_min_global, x_max_global)
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
     plt_props = {}
@@ -136,7 +113,7 @@ def load_viewport_datasets(x_range, metadata):
         plt_props['x_sampling'] = int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=2000
+        plt_props['subsample_freq']=20
     elif (x1-x0)<np.timedelta64(1, 'D'):
         # activate sparse data mode to speed up reactivity
         zoomed_in = True
@@ -145,22 +122,21 @@ def load_viewport_datasets(x_range, metadata):
         plt_props['x_sampling'] = 1#int(dtns/10000)
         plt_props['y_sampling']=0.1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=100
+        plt_props['subsample_freq']=1
     else:
         # load delayed mode datasets for more detail
         zoomed_out = False
         plt_props['x_sampling']=8.64e13/24
         plt_props['y_sampling']=0.2
         plt_props['dynfontsize']=10
-        plt_props['subsample_freq']=100
+        plt_props['subsample_freq']=1
     return meta, plt_props
 
 
-def get_xsection(x_range):
+def get_xsection():
     variable='temperature'
-    meta, plt_props = load_viewport_datasets(x_range, metadata)
+    meta, plt_props = load_viewport_datasets((x_min_global,x_max_global))
     plotslist = []
-    # note: only the first plot in the list needs the **ropts. Everything else migh
     for dsid in meta.index:
         #data=dsdict[dsid] if zoomed_out else dsdict[dsid.replace('nrt', 'delayed')]
         data=dsdict[dsid.replace('nrt', 'delayed')]
@@ -170,15 +146,15 @@ def get_xsection(x_range):
     return reduce(lambda x, y: x*y, plotslist)
 
 
-def get_xsection_raster():
-    print('execute stream')
+def get_xsection_raster(x_range):
+    print('here things go wrong:',x_range)
     variable = variable_widget.value
-    plt_props = {}
-    plt_props['x_sampling']=8.64e13/24
-    plt_props['y_sampling']=0.2
-    plt_props['dynfontsize']=10
-    plt_props['subsample_freq']=1
-    meta, plt_props = metadata, plt_props#load_viewport_datasets(x_range, metadata)
+    (x0, x1) = x_range
+    global x_min_global
+    global x_max_global
+    x_min_global = x0
+    x_max_global = x1
+    meta, plt_props = load_viewport_datasets(x_range)
     plotslist1 = []
     varlist = [dsdict[dsid.replace('nrt', 'delayed')][
         ['time', 'depth', 'temperature', 'salinity',
@@ -189,14 +165,12 @@ def get_xsection_raster():
     dsconc = dsconc.isel(time=slice(
         0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
     mplt = create_single_ds_plot_raster(data=dsconc)
-    # global combined
-    # mplt = combined.apply.opts(cmap=dictionaries.cmap_dict['temperature'])
-    return mplt#, combined
+    return mplt
 
 # on initial load, show all data
 x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
          metadata['time_coverage_end (UTC)'].max().to_datetime64())
-#x_min_global, x_max_global = x_range
+
 range_stream = RangeX(x_range=x_range)
 
 cnorm_widget = pn.widgets.Select(
@@ -208,19 +182,53 @@ variable_widget = pn.widgets.Select(
         'temperature', 'salinity', 'potential_density',
         'chlorophyll','oxygen_concentration'])
 
+global x_min_global
+global x_max_global
+x_min_global, x_max_global = x_range
+#x_min_global = metadata['time_coverage_start (UTC)'].min().to_datetime64()
+#x_max_global = metadata['time_coverage_end (UTC)'].max().to_datetime64()
+
 class GliderExplorer(param.Parameterized):
 
     pick_variable = param.ObjectSelector(
         default='temperature', objects=['temperature', 'salinity'])
     pick_cnorm = param.ObjectSelector(
         default='linear', objects=['linear', 'eq_hist'])
+    #x_range=(x_min_global,
+    #         x_max_global)
 
-    @param.depends('pick_cnorm', 'pick_variable')
+    @param.depends('pick_cnorm','pick_variable', watch=True) # outcommenting this means just depend on all, redraw always
     def create_dynmap(self):
+
+        #x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
+        #        metadata['time_coverage_end (UTC)'].max().to_datetime64())
+        #global x_min_global
+        #global x_max_global
+        #import pdb; pdb.set_trace();
+        #global x_min_global
+        #global x_max_global
+        x_range=(x_min_global,
+                 x_max_global)
+        # print('dynmap VALUES!!!!!!',
+        #    x_min_global,
+        #    x_max_global)
+        range_stream = RangeX(x_range=x_range)
+
+
+
+        pick_cnorm='linear'
+        print('execute dynmap',range_stream)
+        # here everything is alright!
+
+
+        #global meta
+        #meta = hv.DynamicMap(load_viewport_datasets,streams=[range_stream])
+        #dmap = hv.DynamicMap(get_xsection, streams=[range_stream])
         dmap_raster = hv.DynamicMap(
             get_xsection_raster,
-            #streams=[range_stream],
+            streams=[range_stream],
             )
+        #range_stream = hv.streams.RangeX(source=dmap_raster)
         # Bis hierher habe ich einen stream.
         # das problem ist das jede bind auswahl meinen
         # stream zerstört, folgende daten zwar dynamic maps sind
@@ -245,9 +253,18 @@ class GliderExplorer(param.Parameterized):
             active_tools=['xpan', 'xwheel_zoom'],
             bgcolor="dimgrey",
             clabel=variable_widget.value)
-        dmap = hv.DynamicMap(get_xsection, streams=[range_stream])
-        print('create_dynmap_set_ranges:',x_min_global, x_max_global)
-        return dmap_rasterized.opts(xlim=(x_min_global, x_max_global))
+
+        dmap = hv.DynamicMap(get_xsection)
+
+
+        #x_min_global = x0
+        #x_max_global = x1
+        #global x_range
+        #x_range = range_stream.x_range
+        #(x0, x1) = #x_range
+        #import pdb; pdb.set_trace()
+
+        return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap
 
 
 
@@ -256,6 +273,7 @@ class GliderExplorer(param.Parameterized):
 #    cnorm_widget,
 #    variable_widget)
 glider_explorer=GliderExplorer()
+
 
 pn.Column(glider_explorer.param, glider_explorer.create_dynmap).show(
     title='VOTO SAMBA data',
@@ -275,5 +293,6 @@ Future development ideas:
 * implement async functionen documented in holoviews to not disturb user interaction
 * throw out X_range_stream (possibly) and implement full data dynamic sampling instead. One solution could be to use a dynamic .sample(frac=zoomstufe)
 * plot glidertools gridded data instead (optional, but good for interpolation)...
+* good example to follow is the AdvancedStockExplorer class in the documentation
 ...
 """

@@ -1,17 +1,16 @@
-name: glider_explorer
+name: glider_explorer_hvfixed
 channels:
   - conda-forge
-  - defaults
 dependencies:
+  - holoviews # might be affected by https://github.com/holoviz/holoviews/issues/5501
+  - panel
+  - dask
   - xarray
   - glidertools
   - hvplot
   - cmocean
-  - holoviews
   - pathlib
   - pandas
   - datashader
-  - holoviews
-  - numpy
   - panel
-  - erdappy
+  - argopy
