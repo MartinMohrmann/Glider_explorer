@@ -122,7 +122,7 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = True
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = int(dtns/1000)
+        plt_props['x_sampling'] = 8.64e13#int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=1
@@ -131,7 +131,7 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = True
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = int(dtns/1000)
+        plt_props['x_sampling'] = 8.64e13/2#int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=1
