@@ -134,7 +134,7 @@ def load_viewport_datasets(x_range):
         plt_props['x_sampling'] = int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=20
+        plt_props['subsample_freq']=1
     elif (x1-x0)<np.timedelta64(1, 'D'):
         # activate sparse data mode to speed up reactivity
         plt_props['zoomed_out'] = False
@@ -226,8 +226,8 @@ def get_xsection_raster(x_range):
     #times = gt.utils.group_by_profiles(ds).mean().time.values
     #dfmld.hvplot.line(x='time', y='mld', color='white').opts(default_tools=[])
     dsconc['cplotvar'] = dsconc[glider_explorer.pick_variable]
-    dsconc = dsconc.isel(time=slice(
-        0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
+    #dsconc = dsconc.isel(time=slice(
+    #    0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
     mplt = create_single_ds_plot_raster(data=dsconc)
     return mplt#*mldscatter
 
