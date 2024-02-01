@@ -128,7 +128,7 @@ def load_viewport_datasets(x_range):
         plt_props['subsample_freq']=1
     if (x1-x0)>np.timedelta64(180, 'D'):
         # activate sparse data mode to speed up reactivity
-        plt_props['zoomed_out'] = True
+        plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
         plt_props['x_sampling'] = 8.64e13/2#int(dtns/1000)
