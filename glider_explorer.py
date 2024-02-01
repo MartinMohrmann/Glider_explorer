@@ -261,12 +261,15 @@ class GliderExplorer(param.Parameterized):
     )
     pick_cnorm = param.ObjectSelector(
         default='linear', objects=['linear', 'eq_hist'])
+    pick_aggregation = param.ObjectSelector(
+        default='mean', objects=['mean', 'std', 'var'])
     pick_mld = param.Boolean(
         default=False)
+
     #x_range=(x_min_global,
     #         x_max_global)
 
-    @param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_mld') # outcommenting this means just depend on all, redraw always
+    @param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
     def create_dynmap(self):
 
         #x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
@@ -309,8 +312,12 @@ class GliderExplorer(param.Parameterized):
         if self.pick_mld:
             dmap_mld = hv.DynamicMap(get_xsection_mld, streams=[range_stream])
         #dmap_mld_rasterized = spread(tf.shade(dmap_mld),px=5)
-
-        means = dsh.mean('cplotvar')
+        if self.pick_aggregation=='mean':
+            means = dsh.mean('cplotvar')
+        if self.pick_aggregation=='std':
+            means = dsh.std('cplotvar')
+        if self.pick_aggregation=='var':
+            means = dsh.var('cplotvar')
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
                     x_sampling=8.64e13/48,
