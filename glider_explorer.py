@@ -126,7 +126,7 @@ def load_viewport_datasets(x_range):
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=1
-    if (x1-x0)>np.timedelta64(180, 'D'):
+    elif (x1-x0)>np.timedelta64(180, 'D'):
         # activate sparse data mode to speed up reactivity
         plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
