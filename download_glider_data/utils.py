@@ -129,6 +129,7 @@ def _cached_dataset_exists(ds_id, request):
     else:
         print(f"no cache record found for {ds_id}")
         return False
+    """"""
     #if not stats["request"] == request:
     #    print(f"request has changed for {ds_id}")
     #    return False

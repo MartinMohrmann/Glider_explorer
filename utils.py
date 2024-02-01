@@ -2,6 +2,7 @@ from erddapy import ERDDAP
 import pprint
 from ast import literal_eval
 import pandas as pd
+import numpy as np
 
 
 def load_metadata():
@@ -78,11 +79,12 @@ def filter_metadata():
     mode = 'all' # 'nrt', 'delayed'
     metadata = load_metadata()
     metadata = metadata[
-        (metadata['basin']=='Bornholm Basin') &
-        (metadata['time_coverage_start (UTC)'].dt.year==2022) &
-        (metadata['time_coverage_start (UTC)'].dt.month<3)
+        (metadata['project']=='SAMBA') &
+        #(metadata['basin']=='Bornholm Basin') &
+        (metadata['time_coverage_start (UTC)'].dt.year==2023) &
+        (metadata['time_coverage_start (UTC)'].dt.month<13)
         ]
-    metadata = drop_overlaps(metadata)
+    #metadata = drop_overlaps(metadata)
     return metadata
 
 def add_delayed_dataset_ids(metadata):
@@ -97,31 +99,53 @@ def add_delayed_dataset_ids(metadata):
 def drop_overlaps(metadata):
     drop_overlap=True
     dropped_datasets = []
-    for index in range(0, len(metadata)):
-        glidercounter = 1
-        maskedregions = []
-        color = 'k'
-        for index2 in range(0, index):
-            r1 = dict(start=metadata.iloc[index]['time_coverage_start (UTC)'],
-                      end=metadata.iloc[index]['time_coverage_end (UTC)'])
-            r2 = dict(start=metadata.iloc[index2]['time_coverage_start (UTC)'],
-                      end=metadata.iloc[index2]['time_coverage_end (UTC)'])
-            latest_start = max(r1['start'], r2['start'])
-            earliest_end = min(r1['end'], r2['end'])
-            delta = (earliest_end - latest_start).days + 1
-            overlap = max(0, delta)
-            if overlap > 1:
-                glidercounter += 1
-                # if two Glider datasets are overlapping by more than a
-                # day, they are plotted in multiple rows...
-                if drop_overlap:
-                    # ...and optionally dropped
-                    dropped_datasets.append(metadata.index[index])
-                    color = 'red'
+    for basin in ['Bornholm Basin', 'Skagerrak, Kattegat',
+        'Western Gotland', 'Eastern Gotland', 'Åland Sea']:
+        meta = metadata[metadata['basin']==basin]
+        for index in range(0, len(meta)):
+            glidercounter = 1
+            maskedregions = []
+            color = 'k'
+            for index2 in range(0, index):
+                r1 = dict(start=meta.iloc[index]['time_coverage_start (UTC)'],
+                        end=meta.iloc[index]['time_coverage_end (UTC)'])
+                r2 = dict(start=meta.iloc[index2]['time_coverage_start (UTC)'],
+                        end=meta.iloc[index2]['time_coverage_end (UTC)'])
+                latest_start = max(r1['start'], r2['start'])
+                earliest_end = min(r1['end'], r2['end'])
+                delta = (earliest_end - latest_start).days + 1
+                overlap = max(0, delta)
+                if overlap > 1:
+                    glidercounter += 1
+                    # if two Glider datasets are overlapping by more than a
+                    # day, they are plotted in multiple rows...
+                    if drop_overlap:
+                        # ...and optionally dropped
+                        dropped_datasets.append(meta.index[index])
+                        color = 'red'
 
     print('dropping datasets {}'.format(dropped_datasets))
     metadata = metadata.drop(dropped_datasets)
     return metadata
+
+def voto_seaexplorer_dataset(ds):
+    """
+    Adapts a VOTO xarray dataset, for example downloaded from the VOTO ERDAP
+    server (https://erddap.observations.voiceoftheocean.org/erddap/index.html)
+    to be used in GliderTools
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset containing the all columns in the source file and dives column
+    """
+    ds = add_dive_column(ds)
+    return ds
+
 
 # this is a version were I only change the profile_nums, to try if no-concatenation helps with datashader performance
 def voto_concat_datasets(datasets):
@@ -155,3 +179,58 @@ def voto_concat_datasets(datasets):
         )
     return datasets
 
+
+def add_dive_column(ds):
+    """add dive column to dataset
+
+    Parameters:
+    -----------
+    ds: xarray.Dataset
+
+    Returns:
+    --------
+    xarray.Dataset
+        Dataset containing a dives column
+    """
+    #import pdb; pdb.set_trace()
+    #ds["dives"] = (['time'], np.where(ds.profile_direction == 1, ds.profile_num, ds.profile_num + 0.5))
+    ds["dives"] = (["time"],np.where(ds.profile_direction == 1, ds.profile_num, ds.profile_num + 0.5),)
+    return ds
+
+"""
+def voto_concat_datasets(datasets):
+
+    Concatenates multiple datasets along the time dimensions, profile_num
+    and dives variable(s) are adapted so that they start counting from one
+    for the first dataset and monotonically increase.
+
+    Parameters
+    ----------
+    datasets : list of xarray.Datasets
+
+    Returns
+    -------
+    xarray.Dataset
+        concatenated Dataset containing all the data from the list of datasets
+
+    import dask
+    import xarray as xr
+    # in case the datasets have a different set of variables, emtpy variables are created
+    # to allow for concatenation (concat with different set of variables leads to error)
+    mlist = [set(dataset.variables.keys()) for dataset in datasets]
+    allvariables = set.union(*mlist)
+    for dataset in datasets:
+        missing_vars = allvariables - set(dataset.variables.keys())
+        for missing_var in missing_vars:
+            dataset[missing_var] = np.nan
+
+    # renumber profiles, so that profile_num still is unique in concat-dataset
+    for index in range(1, len(datasets)):
+        datasets[index]["profile_num"] += (
+            datasets[index - 1].copy()["profile_num"].max()
+        )
+    ds = xr.concat(datasets, dim="time")
+    ds = add_dive_column(ds)
+
+    return ds.to_dask_dataframe()
+"""

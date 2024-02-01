@@ -1,4 +1,4 @@
-name: glider_explorer_hvfixed
+name: glider_explorer
 channels:
   - conda-forge
 dependencies:
@@ -6,7 +6,7 @@ dependencies:
   - panel
   - dask
   - xarray
-  - glidertools
+  - glidertools>2022
   - hvplot
   - cmocean
   - pathlib
