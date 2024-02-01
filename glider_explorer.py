@@ -22,8 +22,11 @@ import dictionaries
 
 # unused imports
 # import hvplot.pandas
-# import cudf # works w. cuda, but slow.
-# import hvplot.cudf
+#import cudf # works w. cuda, but slow.
+try:
+    import hvplot.cudf
+except:
+    print('no cudf available, that is fine but slower')
 
 ###### filter metadata to prepare download ##############
 metadata = utils.filter_metadata()
@@ -158,7 +161,7 @@ def get_xsection():
     for dsid in meta.index:
         #this is just plotting lines and meta, so I don't need 'delayed'
         #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
-        #data=dsdict[dsid.replace('nrt', 'delayed')]
+        data=dsdict[dsid]
         single_plot = create_single_ds_plot(
             data, metadata, variable, dsid, plt_props)
         plotslist.append(single_plot)
@@ -182,7 +185,10 @@ def get_xsection_mld(x_range):
     plotslist = []
     for ds in dslist:
         mld = gt.physics.mixed_layer_depth(ds, 'temperature', thresh=0.1, verbose=False, ref_depth=10)
-        gtime = gt.utils.group_by_profiles(ds, variables=['time', 'temperature']).mean().time.values
+        #import pdb; pdb.set_trace();
+        ds = ds.to_pandas() # alternatively to cudf?
+        #import pdb; pdb.set_trace();
+        gtime = ds.reset_index().groupby(by='profile_num').mean().time#gt.utils.group_by_profiles(ds, variables=['time', 'temperature']).mean().time.values
         gmld = mld.values
         dfmld = pd.DataFrame.from_dict(dict(time=gtime, mld=gmld))
         #dfmld['mld'] = dfmld.mld.rolling(window=10, min_periods=5, center=True).mean()
@@ -271,7 +277,7 @@ class GliderExplorer(param.Parameterized):
     #x_range=(x_min_global,
     #         x_max_global)
 
-    @param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
+    #@param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
     def create_dynmap(self):
 
         #x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
