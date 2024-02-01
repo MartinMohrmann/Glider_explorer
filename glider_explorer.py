@@ -15,6 +15,7 @@ from functools import reduce
 import panel as pn
 import param
 import datashader.transfer_functions as tf
+pn.extension('plotly')
 
 from download_glider_data import utils as dutils
 import utils
@@ -124,10 +125,10 @@ def load_viewport_datasets(x_range):
         plt_props['x_sampling'] = int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=200
+        plt_props['subsample_freq']=1
     if (x1-x0)>np.timedelta64(180, 'D'):
         # activate sparse data mode to speed up reactivity
-        plt_props['zoomed_out'] = False
+        plt_props['zoomed_out'] = True
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
         plt_props['x_sampling'] = int(dtns/1000)
@@ -236,7 +237,7 @@ x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
 
 range_stream = RangeX(x_range=x_range)
 
-cnorm_widget = pn.widgets.Select(
+""" cnorm_widget = pn.widgets.Select(
     name="icnorm",
     value="linear", options=['linear', 'eq_hist'])
 variable_widget = pn.widgets.Select(
@@ -247,7 +248,7 @@ variable_widget = pn.widgets.Select(
 basin_widget = pn.widgets.Select(
     name="basin",
     value="Bornholm Basin", options=[
-        'Bornholm Basin', 'Eastern Gotland'])
+        'Bornholm Basin', 'Eastern Gotland']) """
 
 global x_min_global
 global x_max_global
@@ -343,7 +344,7 @@ class GliderExplorer(param.Parameterized):
             cnorm=self.pick_cnorm,#cnorm_value,
             active_tools=['xpan', 'xwheel_zoom'],
             bgcolor="dimgrey",
-            clabel=variable_widget.value)
+            clabel=self.pick_variable)
 
         dmap = hv.DynamicMap(get_xsection)
 
