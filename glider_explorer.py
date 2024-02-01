@@ -27,7 +27,7 @@ import dictionaries
 
 ###### filter metadata to prepare download ##############
 metadata = utils.filter_metadata()
-metadata = metadata.drop(['nrt_SEA067_M15', 'nrt_SEA079_M14'], errors='ignore') #!!!!!!!!!!!!!!!!!!!! # temporary data inconsistency
+metadata = metadata.drop(['nrt_SEA067_M15', 'nrt_SEA079_M14', 'nrt_SEA061_M63'], errors='ignore') #!!!!!!!!!!!!!!!!!!!! # temporary data inconsistency
 all_dataset_ids = utils.add_delayed_dataset_ids(metadata) # hacky
 
 ###### download actual data ##############################
@@ -112,7 +112,7 @@ def load_viewport_datasets(x_range):
     #print('loading data for basin', basin_widget.value)
     #zoomed_out = False
     #zoomed_in = False
-    print(f'len of meta is {len(meta)} in get_xsection_raster')
+    print(f'len of meta is {len(meta)} in load_viewport_datasets')
     if (x1-x0)>np.timedelta64(360, 'D'):
         # activate sparse data mode to speed up reactivity
         plt_props['zoomed_out'] = True
@@ -156,7 +156,8 @@ def get_xsection():
     meta, plt_props = load_viewport_datasets((x_min_global,x_max_global))
     plotslist = []
     for dsid in meta.index:
-        data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
+        #this is just plotting lines and meta, so I don't need 'delayed'
+        #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
         #data=dsdict[dsid.replace('nrt', 'delayed')]
         single_plot = create_single_ds_plot(
             data, metadata, variable, dsid, plt_props)
@@ -165,6 +166,7 @@ def get_xsection():
 
 
 def get_xsection_mld(x_range):
+    print('EXCUTE MLD')
     variable='temperature'
     meta, plt_props = load_viewport_datasets(x_range)
     metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]

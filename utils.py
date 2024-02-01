@@ -81,7 +81,7 @@ def filter_metadata():
     metadata = metadata[
         (metadata['project']=='SAMBA') &
         #(metadata['basin']=='Bornholm Basin') &
-        (metadata['time_coverage_start (UTC)'].dt.year==2023) &
+        (metadata['time_coverage_start (UTC)'].dt.year<2024) &
         (metadata['time_coverage_start (UTC)'].dt.month<13)
         ]
     #metadata = drop_overlaps(metadata)
