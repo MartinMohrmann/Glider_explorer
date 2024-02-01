@@ -329,7 +329,8 @@ class GliderExplorer(param.Parameterized):
             means = dsh.var('cplotvar')
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
-                    x_sampling=8.64e13/48,
+                    x_sampling=8.64e13/24,
+                    y_sampling=0.2,
                     ).opts(
             #alpha=0.2,
             invert_yaxis=True,
