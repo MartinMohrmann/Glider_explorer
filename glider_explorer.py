@@ -242,6 +242,44 @@ def get_xsection_raster(x_range):
     t2 = time.perf_counter()
     return mplt#*mldscatter
 
+
+def get_xsection_points(x_range):
+    #import pdb; pdb.set_trace();
+    #print('here things go wrong:',x_range)
+    #variable = glider_explorer
+    (x0, x1) = x_range
+
+    if (x1-x0)<np.timedelta64(4, 'D'):
+        meta, plt_props = load_viewport_datasets(x_range)
+        plotslist1 = []
+        #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
+        metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
+        #import pdb; pdb.set_trace();
+        varlist = [dsdict[dsid] for dsid in metakeys]
+        dsconc = pd.concat(varlist)#xarray.concat(varlist, dim='time')
+        #mld = gt.physics.mixed_layer_depth(
+        #    dsconc, 'temperature', thresh=0.3, verbose=False, ref_depth=5)
+        #times = gt.utils.group_by_profiles(ds).mean().time.values
+        #dfmld.hvplot.line(x='time', y='mld', color='white').opts(default_tools=[])
+        dsconc['cplotvar'] = dsconc[glider_explorer.pick_variable]
+        #raster = spread(
+        points = dsconc.hvplot.points(
+            x='time',
+            y='depth',
+            c='cplotvar',
+            #datashade=True,
+            )#, px=4)
+    else:
+        dsconc = pd.DataFrame.from_dict(dict(time=[x0], depth=[0], cplotvar=[10]))
+        points = dsconc.hvplot.points(
+            x='time',
+            y='depth',
+            c='cplotvar',
+            #datashade=True,
+            )#, px=4)
+    return points
+
+
 # on initial load, show all data
 x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
          metadata['time_coverage_end (UTC)'].max().to_datetime64())
@@ -321,6 +359,13 @@ class GliderExplorer(param.Parameterized):
             cache_size=1
             #self.pick_variable,
             )
+
+        dmap_points = hv.DynamicMap(
+                    get_xsection_points,#(self.pick_variable),
+                    streams=[range_stream],
+                    cache_size=1
+                   #self.pick_variable,
+                    )
         #import pdb; pdb.set_trace();
         #range_stream = hv.streams.RangeX(source=dmap_raster)
         # Bis hierher habe ich einen stream.
@@ -341,9 +386,8 @@ class GliderExplorer(param.Parameterized):
         #decimate.max_samples=int(1e6)
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
-                    x_sampling=8.64e13/24,
-                    y_sampling=0.2,
-                    cache_size=1
+                    #x_sampling=8.64e13/24,
+                    #y_sampling=0.2,
                     ).opts(
             #alpha=0.2,
             invert_yaxis=True,
@@ -360,6 +404,12 @@ class GliderExplorer(param.Parameterized):
             bgcolor="dimgrey",
             clabel=self.pick_variable)
 
+        #dmap_rasterized_points = rasterize(dmap_points,
+        #            aggregator=means,
+        #            x_sampling=8.64e13/24,
+        #            y_sampling=0.2,
+        #            )
+
         dmap = hv.DynamicMap(get_xsection, cache_size=1)
         t2 = time.perf_counter()
         #print('MAINFUNCTION', t2-t1)
@@ -370,10 +420,27 @@ class GliderExplorer(param.Parameterized):
         #x_range = range_stream.x_range
         #(x0, x1) = #x_range
         #import pdb; pdb.set_trace()
+        dmap_points = spread(datashade(
+            dmap_points,
+            aggregator=means,
+            cnorm=self.pick_cnorm,
+            cmap=dictionaries.cmap_dict[self.pick_variable],), px=4).opts(
+                invert_yaxis=True,
+                #colorbar=True,
+                #cmap=dictionaries.cmap_dict[self.pick_variable],#,cmap
+                toolbar='above',
+                tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
+                default_tools=[],
+                #responsive=True,
+                width=800,
+                height=400,
+                #cnorm_value,
+                active_tools=['xpan', 'xwheel_zoom'],
+                bgcolor="dimgrey",)#*dmap*dmap_rasterized)
         if self.pick_mld:
-            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
+            return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
         else:
-            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap
+            return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap
         #return dmap*dmap_mld
 
 
@@ -406,5 +473,6 @@ Future development ideas:
 * add secondary plot or the option for secondary linked plot
 * disentangle interactivity, so that partial refreshes (e.g. mixed layer calculation only) don't trigger complete refresh
 * otpimal colorbar range (percentiles?)
+* on selection of a new basin, I should reset the ranges. Otherwise it could come up with an error when changing while having unavailable x_range.
 ...
 """
