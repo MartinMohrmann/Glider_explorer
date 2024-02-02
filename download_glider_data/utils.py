@@ -201,7 +201,11 @@ def add_adcp_data(ds):
 
 
 def _preprocess(ds):
-    return ds.dropna(dim='time', how='all', subset=['oxygen_concentration', 'chlorophyll'])
+    # import pdb; pdb.set_trace();
+    if ds.dataset_id[0:3]=='nrt':
+        return ds
+    else:
+        return ds.dropna(dim='time', how='all', subset=['oxygen_concentration', 'chlorophyll'])
     # this is to bring overly fine sampled datasets (e.g. every 5ms) to a more performant 1s resolution
     #dt = (ds.time.max()-ds.time.min())/len(ds.time)/1e6 # sampling frequency in ms
     #if dt<500:

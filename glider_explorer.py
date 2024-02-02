@@ -123,13 +123,13 @@ def load_viewport_datasets(x_range):
     print(f'len of meta is {len(meta)} in load_viewport_datasets')
     if (x1-x0)>np.timedelta64(360, 'D'):
         # activate sparse data mode to speed up reactivity
-        plt_props['zoomed_out'] = True
+        plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
         plt_props['x_sampling'] = (dtns/1000)#8.64e13#int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=1
+        plt_props['subsample_freq']=50
     elif (x1-x0)>np.timedelta64(180, 'D'):
         # activate sparse data mode to speed up reactivity
         plt_props['zoomed_out'] = False
@@ -235,7 +235,8 @@ def get_xsection_raster(x_range):
     #times = gt.utils.group_by_profiles(ds).mean().time.values
     #dfmld.hvplot.line(x='time', y='mld', color='white').opts(default_tools=[])
     dsconc['cplotvar'] = dsconc[glider_explorer.pick_variable]
-    #dsconc = dsconc.isel(time=slice(
+    dsconc = dsconc.iloc[0:-1:plt_props['subsample_freq']]
+    #iloc(time=slice(
     #    0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
     mplt = create_single_ds_plot_raster(data=dsconc)
     t2 = time.perf_counter()
@@ -305,10 +306,8 @@ class GliderExplorer(param.Parameterized):
         #    x_min_global,
         #    x_max_global)
         range_stream = RangeX(x_range=x_range)
-
-
-
         pick_cnorm='linear'
+
         #print('execute dynmap',range_stream)
         # here everything is alright!
 
