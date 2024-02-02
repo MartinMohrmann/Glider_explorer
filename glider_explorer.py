@@ -339,8 +339,8 @@ class GliderExplorer(param.Parameterized):
             means = dsh.std('cplotvar')
         if self.pick_aggregation=='var':
             means = dsh.var('cplotvar')
-        decimate.max_samples=int(1e6)
-        dmap_rasterized = rasterize(decimate(dmap_raster),
+        #decimate.max_samples=int(1e6)
+        dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
                     x_sampling=8.64e13/24,
                     y_sampling=0.2,
