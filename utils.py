@@ -80,9 +80,10 @@ def filter_metadata():
     metadata = load_metadata()
     metadata = metadata[
         (metadata['project']=='SAMBA') &
-        #(metadata['basin']=='Bornholm Basin') &
-        (metadata['time_coverage_start (UTC)'].dt.year==2023) &
-        (metadata['time_coverage_start (UTC)'].dt.month<13)
+        (metadata['basin']=='Bornholm Basin') &
+        (metadata['time_coverage_start (UTC)'].dt.year<2024) &
+        (metadata['time_coverage_start (UTC)'].dt.year>2022) #&
+        #(metadata['time_coverage_start (UTC)'].dt.month<3)
         ]
     #for basins
     metadata = drop_overlaps(metadata)
@@ -166,12 +167,12 @@ def voto_concat_datasets(datasets):
     """
     # in case the datasets have a different set of variables, emtpy variables are created
     # to allow for concatenation (concat with different set of variables leads to error)
-    mlist = [set(dataset.variables.keys()) for dataset in datasets]
-    allvariables = set.union(*mlist)
-    for dataset in datasets:
-        missing_vars = allvariables - set(dataset.variables.keys())
-        for missing_var in missing_vars:
-            dataset[missing_var] = np.nan
+    #mlist = [set(dataset.variables.keys()) for dataset in datasets]
+    #allvariables = set.union(*mlist)
+    #for dataset in datasets:
+    #    missing_vars = allvariables - set(dataset.variables.keys())
+    #    for missing_var in missing_vars:
+    #        dataset[missing_var] = np.nan
 
     # renumber profiles, so that profile_num still is unique in concat-dataset
     for index in range(1, len(datasets)):
@@ -195,7 +196,7 @@ def add_dive_column(ds):
     """
     #import pdb; pdb.set_trace()
     #ds["dives"] = (['time'], np.where(ds.profile_direction == 1, ds.profile_num, ds.profile_num + 0.5))
-    ds["dives"] = (["time"],np.where(ds.profile_direction == 1, ds.profile_num, ds.profile_num + 0.5),)
+    ds["dives"] = np.where(ds.profile_direction == 1, ds.profile_num, ds.profile_num + 0.5)
     return ds
 
 """

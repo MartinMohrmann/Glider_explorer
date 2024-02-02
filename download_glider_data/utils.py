@@ -200,6 +200,16 @@ def add_adcp_data(ds):
     return ds
 
 
+def _preprocess(ds):
+    return ds.dropna(dim='time', how='all', subset=['oxygen_concentration', 'chlorophyll'])
+    # this is to bring overly fine sampled datasets (e.g. every 5ms) to a more performant 1s resolution
+    #dt = (ds.time.max()-ds.time.min())/len(ds.time)/1e6 # sampling frequency in ms
+    #if dt<500:
+    #    return ds.isel(time=slice(0,-1,100))#.sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
+    #else:
+    #    return ds
+
+
 def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=False, delayed_only=False,
                             cache_datasets=True, adcp=False):
     """
@@ -243,10 +253,10 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
             dataset_nc = cache_dir / f"{ds_name}.nc"
             if cached_dataset:
                 print(f"Found {ds_name} in {cache_dir}. Loading from disk")
-                ds = xr.open_mfdataset(dataset_nc)
+                ds = xr.open_mfdataset(dataset_nc, preprocess=_preprocess, parallel=True)
                 if adcp:
                     ds = add_adcp_data(ds)
-                glider_datasets[ds_name] = ds
+                glider_datasets[ds_name] = ds.to_pandas()
             else:
                 print(f"Downloading {ds_name}")
                 try:
@@ -259,7 +269,7 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
                 ds.to_netcdf(dataset_nc)
                 if adcp:
                     ds = add_adcp_data(ds)
-                glider_datasets[ds_name] = ds
+                glider_datasets[ds_name] = ds.to_pandas()
                 _update_stats(ds_name, request)
         else:
             print(f"Downloading {ds_name}")
@@ -272,7 +282,7 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
             ds = _clean_dims(ds)
             if adcp:
                 ds = add_adcp_data(ds)
-            glider_datasets[ds_name] = ds
+            glider_datasets[ds_name] = ds.to_pandas()
     return glider_datasets
 
 

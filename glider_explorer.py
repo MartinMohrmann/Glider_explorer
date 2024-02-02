@@ -1,7 +1,7 @@
 import xarray
 import glidertools as gt
-import hvplot.dask
-import hvplot.xarray
+#import hvplot.dask
+#import hvplot.xarray
 import hvplot.pandas
 import cmocean
 import holoviews as hv
@@ -9,13 +9,14 @@ import pathlib
 import pandas as pd
 import datashader as dsh
 from holoviews.operation.datashader import datashade, rasterize, shade, dynspread, spread
+from holoviews.operation import decimate
 from holoviews.streams import RangeX
 import numpy as np
 from functools import reduce
 import panel as pn
 import param
 import datashader.transfer_functions as tf
-pn.extension('plotly')
+import time
 
 from download_glider_data import utils as dutils
 import utils
@@ -77,15 +78,18 @@ def create_single_ds_plot(data, metadata, variable, dsid, plt_props):
 
 def create_single_ds_plot_raster(
         data):
+    t1 = time.perf_counter()
     raster = data.hvplot.scatter(
         x='time',
         y='depth',
         c='cplotvar',
         )
+    t2 = time.perf_counter()
     return raster
 
 
 def load_viewport_datasets(x_range):
+    t1 = time.perf_counter()
     (x0, x1) = x_range
     dt = x1-x0
     dtns = dt/np.timedelta64(1, 'ns')
@@ -122,7 +126,7 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = True
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = 8.64e13#int(dtns/1000)
+        plt_props['x_sampling'] = (dtns/1000)#8.64e13#int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=1
@@ -134,7 +138,7 @@ def load_viewport_datasets(x_range):
         plt_props['x_sampling'] = 8.64e13/2#int(dtns/1000)
         plt_props['y_sampling']=1
         plt_props['dynfontsize']=4
-        plt_props['subsample_freq']=1
+        plt_props['subsample_freq']=20
     elif (x1-x0)<np.timedelta64(1, 'D'):
         # activate sparse data mode to speed up reactivity
         plt_props['zoomed_out'] = False
@@ -152,10 +156,12 @@ def load_viewport_datasets(x_range):
         plt_props['dynfontsize']=10
         plt_props['subsample_freq']=1
     #import pdb; pdb.set_trace();
+    t2 = time.perf_counter()
     return meta, plt_props
 
 
 def get_xsection():
+    t1 = time.perf_counter()
     variable='temperature'
     meta, plt_props = load_viewport_datasets((x_min_global,x_max_global))
     plotslist = []
@@ -166,11 +172,12 @@ def get_xsection():
         single_plot = create_single_ds_plot(
             data, metadata, variable, dsid, plt_props)
         plotslist.append(single_plot)
+    t2 = time.perf_counter()
     return reduce(lambda x, y: x*y, plotslist)
 
 
 def get_xsection_mld(x_range):
-    print('EXCUTE MLD')
+    t1 = time.perf_counter()
     variable='temperature'
     meta, plt_props = load_viewport_datasets(x_range)
     metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
@@ -183,11 +190,12 @@ def get_xsection_mld(x_range):
     # import pdb; pdb.set_trace();
     #dsconc = xarray.concat(dsconc, dim='time')
     #dsconc['dives'] = dsconc['profile_num']
+    print(type(dslist[0]))
     plotslist = []
     for ds in dslist:
-        mld = gt.physics.mixed_layer_depth(ds, 'temperature', thresh=0.1, verbose=False, ref_depth=10)
+        mld = gt.physics.mixed_layer_depth(ds.to_xarray(), 'temperature', thresh=0.1, verbose=False, ref_depth=10)
         #import pdb; pdb.set_trace();
-        ds = ds.to_pandas() # alternatively to cudf?
+        #ds = ds.to_pandas() # alternatively to cudf?
         #import pdb; pdb.set_trace();
         gtime = ds.reset_index().groupby(by='profile_num').mean().time#gt.utils.group_by_profiles(ds, variables=['time', 'temperature']).mean().time.values
         gmld = mld.values
@@ -201,6 +209,7 @@ def get_xsection_mld(x_range):
             #datashade=True,
         )
         plotslist.append(mldscatter)
+    t2 = time.perf_counter()
     return reduce(lambda x, y: x*y, plotslist)
 
 
@@ -220,7 +229,7 @@ def get_xsection_raster(x_range):
     metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
     #import pdb; pdb.set_trace();
     varlist = [dsdict[dsid] for dsid in metakeys]
-    dsconc = xarray.concat(varlist, dim='time')
+    dsconc = pd.concat(varlist)#xarray.concat(varlist, dim='time')
     #mld = gt.physics.mixed_layer_depth(
     #    dsconc, 'temperature', thresh=0.3, verbose=False, ref_depth=5)
     #times = gt.utils.group_by_profiles(ds).mean().time.values
@@ -229,6 +238,7 @@ def get_xsection_raster(x_range):
     #dsconc = dsconc.isel(time=slice(
     #    0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
     mplt = create_single_ds_plot_raster(data=dsconc)
+    t2 = time.perf_counter()
     return mplt#*mldscatter
 
 # on initial load, show all data
@@ -274,13 +284,14 @@ class GliderExplorer(param.Parameterized):
         default='mean', objects=['mean', 'std', 'var'])
     pick_mld = param.Boolean(
         default=False)
+    #button_inflow = pn.widgets.Button(name='Tell me about inflows', button_type='primary')
 
     #x_range=(x_min_global,
     #         x_max_global)
 
     #@param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
     def create_dynmap(self):
-
+        t1 = time.perf_counter()
         #x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
         #        metadata['time_coverage_end (UTC)'].max().to_datetime64())
         #global x_min_global
@@ -298,7 +309,7 @@ class GliderExplorer(param.Parameterized):
 
 
         pick_cnorm='linear'
-        print('execute dynmap',range_stream)
+        #print('execute dynmap',range_stream)
         # here everything is alright!
 
 
@@ -308,6 +319,7 @@ class GliderExplorer(param.Parameterized):
         dmap_raster = hv.DynamicMap(
             get_xsection_raster,#(self.pick_variable),
             streams=[range_stream],
+            cache_size=1
             #self.pick_variable,
             )
         #import pdb; pdb.set_trace();
@@ -319,7 +331,7 @@ class GliderExplorer(param.Parameterized):
 
         #return dmap_raster#.opts(xlim=(x_min_global, x_max_global))
         if self.pick_mld:
-            dmap_mld = hv.DynamicMap(get_xsection_mld, streams=[range_stream])
+            dmap_mld = hv.DynamicMap(get_xsection_mld, streams=[range_stream], cache_size=1)
         #dmap_mld_rasterized = spread(tf.shade(dmap_mld),px=5)
         if self.pick_aggregation=='mean':
             means = dsh.mean('cplotvar')
@@ -327,10 +339,12 @@ class GliderExplorer(param.Parameterized):
             means = dsh.std('cplotvar')
         if self.pick_aggregation=='var':
             means = dsh.var('cplotvar')
-        dmap_rasterized = rasterize(dmap_raster,
+        decimate.max_samples=int(1e6)
+        dmap_rasterized = rasterize(decimate(dmap_raster),
                     aggregator=means,
                     x_sampling=8.64e13/24,
                     y_sampling=0.2,
+                    cache_size=1
                     ).opts(
             #alpha=0.2,
             invert_yaxis=True,
@@ -347,8 +361,9 @@ class GliderExplorer(param.Parameterized):
             bgcolor="dimgrey",
             clabel=self.pick_variable)
 
-        dmap = hv.DynamicMap(get_xsection)
-
+        dmap = hv.DynamicMap(get_xsection, cache_size=1)
+        t2 = time.perf_counter()
+        #print('MAINFUNCTION', t2-t1)
 
         #x_min_global = x0
         #x_max_global = x1
@@ -389,5 +404,8 @@ Future development ideas:
 * throw out X_range_stream (possibly) and implement full data dynamic sampling instead. One solution could be to use a dynamic .sample(frac=zoomstufe)
 * plot glidertools gridded data instead (optional, but good for interpolation)...
 * good example to follow is the AdvancedStockExplorer class in the documentation
+* add secondary plot or the option for secondary linked plot
+* disentangle interactivity, so that partial refreshes (e.g. mixed layer calculation only) don't trigger complete refresh
+* otpimal colorbar range (percentiles?)
 ...
 """
