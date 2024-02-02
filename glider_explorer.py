@@ -387,7 +387,7 @@ class GliderExplorer(param.Parameterized):
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
                     #x_sampling=8.64e13/24,
-                    #y_sampling=0.2,
+                    y_sampling=0.1,
                     ).opts(
             #alpha=0.2,
             invert_yaxis=True,
