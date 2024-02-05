@@ -96,7 +96,7 @@ def load_viewport_datasets(x_range):
     plt_props = {}
     #delayedkeys = [item for item in dsdict.keys() if item[0:7]=='delayed']
     #nrtkeys =  [item for item in dsdict.keys() if item[0:3]=='nrt']
-    meta = metadata[metadata['basin']==glider_explorer.pick_basin]
+    meta = metadata[metadata['basin']==currentobject.pick_basin]
     meta = meta[
             # x0 and x1 are the time start and end of our view, the other times
             # are the start and end of the individual datasets. To increase
@@ -213,7 +213,6 @@ def get_xsection_mld(x_range):
     return reduce(lambda x, y: x*y, plotslist)
 
 
-
 def get_xsection_raster(x_range):
     #import pdb; pdb.set_trace();
     #print('here things go wrong:',x_range)
@@ -234,7 +233,8 @@ def get_xsection_raster(x_range):
     #    dsconc, 'temperature', thresh=0.3, verbose=False, ref_depth=5)
     #times = gt.utils.group_by_profiles(ds).mean().time.values
     #dfmld.hvplot.line(x='time', y='mld', color='white').opts(default_tools=[])
-    dsconc['cplotvar'] = dsconc[glider_explorer.pick_variable]
+    #import pdb; pdb.set_trace()
+    dsconc['cplotvar'] = dsconc[currentobject.pick_variable]
     dsconc = dsconc.iloc[0:-1:plt_props['subsample_freq']]
     #iloc(time=slice(
     #    0,-1,plt_props['subsample_freq']), drop=True)#data.to_dask_dataframe().sample(0.1)
@@ -244,9 +244,10 @@ def get_xsection_raster(x_range):
 
 
 def get_xsection_points(x_range):
-    #import pdb; pdb.set_trace();
-    #print('here things go wrong:',x_range)
-    #variable = glider_explorer
+    # currently not activated, but almost completely working.
+    # only had some slight problems to keep zoom settings on variable change,
+    # but that should be easy to solve...
+
     (x0, x1) = x_range
 
     if (x1-x0)<np.timedelta64(4, 'D'):
@@ -284,7 +285,7 @@ def get_xsection_points(x_range):
 x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
          metadata['time_coverage_end (UTC)'].max().to_datetime64())
 
-range_stream = RangeX(x_range=x_range)
+#range_stream = RangeX(x_range=x_range)
 
 """ cnorm_widget = pn.widgets.Select(
     name="icnorm",
@@ -329,7 +330,18 @@ class GliderExplorer(param.Parameterized):
     #         x_max_global)
 
     #@param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
+
+
+    def get_xsection_raster(x_range):
+        #import pdb; pdb.set_trace();
+        #print('here things go wrong:',x_range)
+        #variable = glider_explorer
+        print('blubb')
+
+
     def create_dynmap(self):
+        global currentobject
+        currentobject = self
         t1 = time.perf_counter()
         #x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
         #        metadata['time_coverage_end (UTC)'].max().to_datetime64())
@@ -343,6 +355,7 @@ class GliderExplorer(param.Parameterized):
         # print('dynmap VALUES!!!!!!',
         #    x_min_global,
         #    x_max_global)
+
         range_stream = RangeX(x_range=x_range)
         pick_cnorm='linear'
 
@@ -353,19 +366,25 @@ class GliderExplorer(param.Parameterized):
         #global meta
         #meta = hv.DynamicMap(load_viewport_datasets,streams=[range_stream])
         #dmap = hv.DynamicMap(get_xsection, streams=[range_stream])
+
         dmap_raster = hv.DynamicMap(
             get_xsection_raster,#(self.pick_variable),
-            streams=[range_stream],
-            cache_size=1
+            streams=[range_stream],)
+            #cache_size=1,
+            #self=self
             #self.pick_variable,
-            )
+        #    )
 
-        dmap_points = hv.DynamicMap(
-                    get_xsection_points,#(self.pick_variable),
-                    streams=[range_stream],
-                    cache_size=1
-                   #self.pick_variable,
-                    )
+        #other_stream = hv.streams.RangeX(x_range=x_range,Globject=self)
+
+        #dmap_raster = hv.DynamicMap(
+        #    get_xsection_raster,#(self.pick_variable),
+        #    streams=[other_stream],
+            #cache_size=1,
+            #self=self
+            #self.pick_variable,
+        #    )
+
         #import pdb; pdb.set_trace();
         #range_stream = hv.streams.RangeX(source=dmap_raster)
         # Bis hierher habe ich einen stream.
@@ -420,27 +439,36 @@ class GliderExplorer(param.Parameterized):
         #x_range = range_stream.x_range
         #(x0, x1) = #x_range
         #import pdb; pdb.set_trace()
+
+        """
+        THIS PART IS WORKING PERFECTLY FINE, should reactivate itm but check zoom ranges on variable change...
+        dmap_points = hv.DynamicMap(
+            get_xsection_points,
+            streams=[range_stream],
+            cache_size=1
+            )
         dmap_points = spread(datashade(
             dmap_points,
             aggregator=means,
             cnorm=self.pick_cnorm,
             cmap=dictionaries.cmap_dict[self.pick_variable],), px=4).opts(
                 invert_yaxis=True,
-                #colorbar=True,
-                #cmap=dictionaries.cmap_dict[self.pick_variable],#,cmap
                 toolbar='above',
                 tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
                 default_tools=[],
-                #responsive=True,
                 width=800,
                 height=400,
-                #cnorm_value,
                 active_tools=['xpan', 'xwheel_zoom'],
-                bgcolor="dimgrey",)#*dmap*dmap_rasterized)
+                bgcolor="dimgrey",)
+        """
+
+
         if self.pick_mld:
-            return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
+            #return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
+            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
         else:
-            return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap
+            #return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap
+            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap
         #return dmap*dmap_mld
 
 
@@ -449,12 +477,23 @@ class GliderExplorer(param.Parameterized):
 #    cnorm_widget,
 #    variable_widget)
 glider_explorer=GliderExplorer()
+glider_explorer2=GliderExplorer()
 
 
-pn.Row(glider_explorer.param, glider_explorer.create_dynmap).show(
+pn.Column(
+    pn.Row(
+        glider_explorer.param,
+        glider_explorer.create_dynmap),
+    pn.Row(
+        glider_explorer2.param,
+        glider_explorer2.create_dynmap)
+        ).show(
     title='VOTO SAMBA data',
     websocket_origin='*',
-    port=12345)
+    port=12345,
+    #admin=True,
+    #profiler=True
+    )
 
 #pn.Column(cnorm_widget,variable_widget, dmap_rasterized_bound).show(
 #    title='VOTO SAMBA data',
