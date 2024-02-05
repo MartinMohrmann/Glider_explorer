@@ -31,9 +31,9 @@ except:
     print('no cudf available, that is fine but slower')
 
 ###### filter metadata to prepare download ##############
-metadata = utils.filter_metadata()
+metadata, all_datasets = utils.filter_metadata()
 metadata = metadata.drop(['nrt_SEA067_M15', 'nrt_SEA079_M14', 'nrt_SEA061_M63'], errors='ignore') #!!!!!!!!!!!!!!!!!!!! # temporary data inconsistency
-all_dataset_ids = utils.add_delayed_dataset_ids(metadata) # hacky
+all_dataset_ids = utils.add_delayed_dataset_ids(metadata, all_datasets) # hacky
 
 ###### download actual data ##############################
 dutils.cache_dir = pathlib.Path('../voto_erddap_data_cache')
@@ -126,8 +126,8 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = (dtns/1000)#8.64e13#int(dtns/1000)
-        plt_props['y_sampling']=1
+        plt_props['x_sampling'] = (dtns/500)#8.64e13#int(dtns/1000)
+        plt_props['y_sampling']=0.1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=50
     elif (x1-x0)>np.timedelta64(180, 'D'):
@@ -135,8 +135,8 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = 8.64e13/2#int(dtns/1000)
-        plt_props['y_sampling']=1
+        plt_props['x_sampling'] = (dtns/500)#8.64e13/2#int(dtns/1000)
+        plt_props['y_sampling']=0.1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=20
     elif (x1-x0)<np.timedelta64(1, 'D'):
@@ -144,15 +144,15 @@ def load_viewport_datasets(x_range):
         plt_props['zoomed_out'] = False
         #x_sampling=8.64e13 # daily
         # grid timeline into n sections
-        plt_props['x_sampling'] = 1#int(dtns/10000)
+        plt_props['x_sampling'] = (dtns/500)#8.64e13/2
         plt_props['y_sampling']=0.1
         plt_props['dynfontsize']=4
         plt_props['subsample_freq']=1
     else:
         # load delayed mode datasets for more detail
         plt_props['zoomed_out'] = False
-        plt_props['x_sampling']=8.64e13/24
-        plt_props['y_sampling']=0.2
+        plt_props['x_sampling']= (dtns/500)#1#8.64e13/2
+        plt_props['y_sampling']=0.1
         plt_props['dynfontsize']=10
         plt_props['subsample_freq']=1
     #import pdb; pdb.set_trace();
@@ -228,8 +228,12 @@ def get_xsection_raster(x_range):
     plotslist1 = []
     #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
     # activate this for high res data
-    # metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
-    metakeys = meta.index
+    if plt_props['zoomed_out']:
+        metakeys = [element.replace('nrt', 'delayed') for element in meta.index]
+    else:
+        metakeys = [element.replace('nrt', 'delayed') if
+            element.replace('nrt', 'delayed') in all_datasets.index else element for element in meta.index]
+    #metakeys = meta.index
 
     #import pdb; pdb.set_trace();
     varlist = [dsdict[dsid] for dsid in metakeys]
@@ -410,8 +414,8 @@ class GliderExplorer(param.Parameterized):
         #decimate.max_samples=int(1e6)
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
-                    #x_sampling=8.64e13/24,
-                    y_sampling=0.1,
+                    x_sampling=8.64e13/24,
+                    y_sampling=.5,
                     ).opts(
             #alpha=0.2,
             invert_yaxis=True,
