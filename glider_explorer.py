@@ -182,7 +182,7 @@ def get_xsection_mld(x_range):
     meta, plt_props = load_viewport_datasets(x_range)
     # activate this for high delayed resolution
     # metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
-    metakeys = [element for element in meta.index]
+    metakeys = meta.index
     #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
     #varlist = [utils.voto_seaexplorer_dataset(dsdict[dsid]) for dsid in meta.index]
     #dsconc = xarray.concat(varlist, dim='time')
@@ -229,7 +229,7 @@ def get_xsection_raster(x_range):
     #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
     # activate this for high res data
     # metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
-    metakeys = [element if element in meta.index]
+    metakeys = meta.index
 
     #import pdb; pdb.set_trace();
     varlist = [dsdict[dsid] for dsid in metakeys]
