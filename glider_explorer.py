@@ -180,9 +180,11 @@ def get_xsection_mld(x_range):
     t1 = time.perf_counter()
     variable='temperature'
     meta, plt_props = load_viewport_datasets(x_range)
-    metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
+    # activate this for high delayed resolution
+    # metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
+    metakeys = [element for element in meta.index]
     #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
-    varlist = [utils.voto_seaexplorer_dataset(dsdict[dsid]) for dsid in meta.index]
+    #varlist = [utils.voto_seaexplorer_dataset(dsdict[dsid]) for dsid in meta.index]
     #dsconc = xarray.concat(varlist, dim='time')
     #dsconc = utils.voto_seaexplorer_dataset(dsconc)
     dslist = utils.voto_concat_datasets(varlist)
@@ -225,7 +227,10 @@ def get_xsection_raster(x_range):
     meta, plt_props = load_viewport_datasets(x_range)
     plotslist1 = []
     #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
-    metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
+    # activate this for high res data
+    # metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
+    metakeys = [element if element in meta.index]
+
     #import pdb; pdb.set_trace();
     varlist = [dsdict[dsid] for dsid in metakeys]
     dsconc = pd.concat(varlist)#xarray.concat(varlist, dim='time')
