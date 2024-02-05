@@ -81,10 +81,9 @@ def load_metadata():
 
 
 def filter_metadata():
-    # actually, I think this function should return a filtered DataFrame and not a list of IDs
+    # Better to return filtered DataFrame instead of IDs?
     mode = 'all' # 'nrt', 'delayed'
     metadata, all_datasets = load_metadata()
-    # import pdb; pdb.set_trace()
     metadata = metadata[
         (metadata['project']=='SAMBA') &
         (metadata['basin']=='Bornholm Basin') &
@@ -103,7 +102,6 @@ def add_delayed_dataset_ids(metadata, all_datasets):
         for datasetid in metadata.index]
 
     all_dataset_ids = nrt_dataset_ids+delayed_dataset_ids
-    # import pdb; pdb.set_trace();
     return all_dataset_ids#metadata.loc[all_dataset_ids]
 
 
