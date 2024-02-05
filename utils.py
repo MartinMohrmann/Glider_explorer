@@ -18,6 +18,12 @@ def load_metadata():
         parse_dates=True,
     )
 
+    e.dataset_id = "allDatasets"
+    all_datasets = e.to_pandas(
+        index_col="datasetID",
+        parse_dates=True,
+    )
+
     def obj_to_string(x):
         return pprint.pformat(x)
 
@@ -71,30 +77,33 @@ def load_metadata():
     metadata = metadata.join(pd.DataFrame.from_dict(newmetadatacolumns))
     metadata['time_coverage_end (UTC)'] = pd.to_datetime(metadata['time_coverage_end (UTC)'])
     metadata['time_coverage_start (UTC)'] = pd.to_datetime(metadata['time_coverage_start (UTC)'])
-    return metadata
+    return metadata, all_datasets
 
 
 def filter_metadata():
     # actually, I think this function should return a filtered DataFrame and not a list of IDs
     mode = 'all' # 'nrt', 'delayed'
-    metadata = load_metadata()
+    metadata, all_datasets = load_metadata()
+    # import pdb; pdb.set_trace()
     metadata = metadata[
         (metadata['project']=='SAMBA') &
         (metadata['basin']=='Bornholm Basin') &
-        (metadata['time_coverage_start (UTC)'].dt.year<2024) &
         (metadata['time_coverage_start (UTC)'].dt.year>2022) #&
-        #(metadata['time_coverage_start (UTC)'].dt.month<3)
+        #(metadata['time_coverage_start (UTC)'].dt.year>2022) &
+        #(metadata['time_coverage_start (UTC)'].dt.month>0)
         ]
     #for basins
     metadata = drop_overlaps(metadata)
-    return metadata
+    return metadata, all_datasets
 
-def add_delayed_dataset_ids(metadata):
+def add_delayed_dataset_ids(metadata, all_datasets):
     nrt_dataset_ids = list(metadata.index)
     delayed_dataset_ids = [
-        datasetid.replace('nrt', 'delayed') for datasetid in metadata.index]
+        datasetid.replace('nrt', 'delayed') if datasetid.replace('nrt', 'delayed') in all_datasets.index else datasetid
+        for datasetid in metadata.index]
+
     all_dataset_ids = nrt_dataset_ids+delayed_dataset_ids
-    #import pdb; pdb.set_trace();
+    # import pdb; pdb.set_trace();
     return all_dataset_ids#metadata.loc[all_dataset_ids]
 
 
