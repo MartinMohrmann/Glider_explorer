@@ -23,6 +23,7 @@ import plotly.express as px
 from download_glider_data import utils as dutils
 import utils
 import dictionaries
+import pickle
 
 pn.extension('plotly')
 
@@ -39,6 +40,7 @@ all_metadata, _ = utils.load_metadata()
 
 ###### filter metadata to prepare download ##############
 metadata, all_datasets = utils.filter_metadata()
+"""
 metadata = metadata.drop(['nrt_SEA067_M15', 'nrt_SEA079_M14', 'nrt_SEA061_M63'], errors='ignore') #!!!!!!!!!!!!!!!!!!!! # temporary data inconsistency
 all_dataset_ids = utils.add_delayed_dataset_ids(metadata, all_datasets) # hacky
 
@@ -49,8 +51,10 @@ variables=['temperature', 'salinity', 'depth',
            'profile_direction', 'chlorophyll',
            'oxygen_concentration', 'cdom', 'backscatter_scaled', 'longitude']
 dsdict = dutils.download_glider_dataset(all_dataset_ids, metadata,
-                                        variables=variables)
-
+                                        variables=variables) """
+file = open('cached_data_dictionary.pickle', 'rb')
+dsdict = pickle.load(file)
+file.close()
 #import pdb; pdb.set_trace();
 
 ####### specify global plot variables ####################
@@ -502,7 +506,7 @@ pn.serve(
     title='VOTO SAMBA data',
     threaded=True)
 
-"""
+
 #.show(
 #    title='VOTO SAMBA data',
 #    websocket_origin='*',
@@ -512,7 +516,7 @@ pn.serve(
 #    )
 
 
-"""
+
 Future development ideas:
 * activate hover (for example dataset details, sensor specs, or point details)
 * holoviews autoupdate for development
