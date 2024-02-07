@@ -231,7 +231,7 @@ def get_xsection_points(x_range):
         metakeys = [element if plt_props['zoomed_out'] else element.replace('nrt', 'delayed') for element in meta.index]
         varlist = [dsdict[dsid] for dsid in metakeys]
         dsconc = pd.concat(varlist)
-        dsconc['cplotvar'] = dsconc[glider_explorer.pick_variable]
+        dsconc['cplotvar'] = dsconc[currentobject.pick_variable]
         points = dsconc.hvplot.points(
             x='time',
             y='depth',
