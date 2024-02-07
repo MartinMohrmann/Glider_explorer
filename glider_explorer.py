@@ -24,6 +24,8 @@ from download_glider_data import utils as dutils
 import utils
 import dictionaries
 
+pn.extension('plotly')
+
 # unused imports
 # import hvplot.pandas
 #import cudf # works w. cuda, but slow.
@@ -31,6 +33,9 @@ try:
     import hvplot.cudf
 except:
     print('no cudf available, that is fine but slower')
+
+# all metadata exists for the metadata visualisation
+all_metadata, _ = utils.load_metadata()
 
 ###### filter metadata to prepare download ##############
 metadata, all_datasets = utils.filter_metadata()
@@ -245,17 +250,13 @@ def get_xsection_points(x_range):
             )
     return points
 
-
 # on initial load, show all data
 x_range=(metadata['time_coverage_start (UTC)'].min().to_datetime64(),
-         metadata['time_coverage_end (UTC)'].max().to_datetime64())
-
+    metadata['time_coverage_end (UTC)'].max().to_datetime64())
 
 global x_min_global
 global x_max_global
 x_min_global, x_max_global = x_range
-
-
 
 class GliderExplorer(param.Parameterized):
 
@@ -283,7 +284,7 @@ class GliderExplorer(param.Parameterized):
 
     dynmap = None
     x_range=(x_min_global,
-             x_max_global)
+            x_max_global)
     range_stream = RangeX(x_range=x_range)
     annotations = []
     about = """\
@@ -423,12 +424,12 @@ class MetaExplorer(param.Parameterized):
 
     @param.depends('pick_serial') # outcommenting this means just depend on all, redraw always
     def create_timeline(self):
-        dfm = metadata.sort_values('basin')#px.data.iris() # replace with your own data source
+        dfm = all_metadata.sort_values('basin')#px.data.iris() # replace with your own data source
         #fig = make_subplots(rows=1, cols=1,
         #                shared_xaxes=True,
         #                vertical_spacing=0.02)
         dims=self.pick_serial
-        timeline_fig = px.timeline(dfm,
+        fig = px.timeline(dfm,
             x_start="time_coverage_start (UTC)",
             x_end="time_coverage_end (UTC)",
             y="basin",
@@ -439,31 +440,77 @@ class MetaExplorer(param.Parameterized):
             hover_data=['ctd_serial', 'optics_serial'],
             color=dims,
             pattern_shape=dims,
+            width=1000, height=400,
+            #scrollZoom=True,
                     )
-        return timeline_fig
+
+            # Add range slider
+        fig.update_layout(
+            title=dims,
+            xaxis=dict(
+                rangeslider=dict(
+                    visible=True
+                ),
+                #type="date"
+            )
+        )
 
 
-glider_explorer=GliderExplorer()
-meta_explorer=MetaExplorer()
+        # fig.update_layout(yaxis=dict(autorange="reversed"))
+        #fig.update_layout(barmode='stack', yaxis={'categoryorder':'total descending'})
+        #fig.update_layout(barmode='group')
+        for shape in fig['data']:
+            shape['opacity'] = 0.7
+        #for shape in fig['data']:
+            #shape['opacity'] = 0.7
+        for i, d in enumerate(fig.data):
+            d.width = (metadata.deployment_id%2+10)/12
+        return fig
+        #config = {'scrollZoom': True}
+        #import pdb; pdb.set_trace()
+        #return timeline_fig
 
-
-# usefull to create secondary plot, but not fully indepentently working yet:
-# glider_explorer2=GliderExplorer()
-
-pn.Column(
+def create_app_instance():
+    glider_explorer=GliderExplorer()
+    meta_explorer=MetaExplorer()
+    layout = pn.Column(
     pn.Row(
         glider_explorer.param,
         glider_explorer.create_dynmap),
     pn.Row(glider_explorer.markdown),
     pn.Row(
-        meta_explorer.param,
-        meta_explorer.create_timeline)).show(
-    title='VOTO SAMBA data',
-    websocket_origin='*',
+        meta_explorer.param),
+    pn.Row(
+        meta_explorer.create_timeline))
+    return layout
+
+# usefull to create secondary plot, but not fully indepentently working yet:
+# glider_explorer2=GliderExplorer()
+
+app = create_app_instance()
+app.servable()
+    #port=12345,
+    #websocket_origin='*',
+    #title='VOTO SAMBA data',
+    #threaded=True)
+
+"""
+pn.serve(
+    create_app_instance,
     port=12345,
+    websocket_origin='*',
+    title='VOTO SAMBA data',
+    threaded=True)
+
+"""
+#.show(
+#    title='VOTO SAMBA data',
+#    websocket_origin='*',
+#    port=12345,
     #admin=True,
     #profiler=True
-    )
+#    )
+
 
 """
 Future development ideas:
