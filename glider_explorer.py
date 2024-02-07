@@ -9,6 +9,7 @@ import pathlib
 import pandas as pd
 import datashader as dsh
 from holoviews.operation.datashader import datashade, rasterize, shade, dynspread, spread
+from bokeh.models import DatetimeTickFormatter, HoverTool
 from holoviews.operation import decimate
 from holoviews.streams import RangeX
 import numpy as np
@@ -40,9 +41,10 @@ dutils.cache_dir = pathlib.Path('../voto_erddap_data_cache')
 variables=['temperature', 'salinity', 'depth',
            'potential_density', 'profile_num',
            'profile_direction', 'chlorophyll',
-           'oxygen_concentration', 'longitude']
-dsdict = dutils.download_glider_dataset(dataset_ids=all_dataset_ids,
+           'oxygen_concentration', 'cdom', 'backscatter_scaled', 'longitude']
+dsdict = dutils.download_glider_dataset(all_dataset_ids, metadata,
                                         variables=variables)
+
 #import pdb; pdb.set_trace();
 
 ####### specify global plot variables ####################
@@ -195,12 +197,16 @@ def get_xsection_raster(x_range):
         metakeys = [element.replace('nrt', 'delayed') for element in meta.index]
     else:
         metakeys = [element.replace('nrt', 'delayed') if
-            element.replace('nrt', 'delayed') in all_datasets.index else element for element in meta.index]
+            element.replace('nrt', 'delayed') in all_datasets.index else
+            element for element in meta.index]
 
     varlist = [dsdict[dsid] for dsid in metakeys]
     dsconc = pd.concat(varlist)
+    # import pdb; pdb.set_trace();
+
     dsconc['cplotvar'] = dsconc[currentobject.pick_variable]
     dsconc = dsconc.iloc[0:-1:plt_props['subsample_freq']]
+    # import pdb; pdb.set_trace();
     mplt = create_single_ds_plot_raster(data=dsconc)
     t2 = time.perf_counter()
     return mplt
@@ -210,10 +216,9 @@ def get_xsection_points(x_range):
     # currently not activated, but almost completely working.
     # only had some slight problems to keep zoom settings on variable change,
     # but that should be easy to solve...
-
     (x0, x1) = x_range
 
-    if (x1-x0)<np.timedelta64(4, 'D'):
+    if (x1-x0)<np.timedelta64(14, 'D'):
         meta, plt_props = load_viewport_datasets(x_range)
         plotslist1 = []
         #data=dsdict[dsid] if plt_props['zoomed_out'] else dsdict[dsid.replace('nrt', 'delayed')]
@@ -227,11 +232,15 @@ def get_xsection_points(x_range):
             c='cplotvar',
             )
     else:
-        dsconc = pd.DataFrame.from_dict(dict(time=[x0], depth=[0], cplotvar=[10]))
+        dsconc = pd.DataFrame.from_dict(
+            dict(time=[x0],
+                 depth=[0],
+                 cplotvar=[np.nan]))
         points = dsconc.hvplot.points(
             x='time',
             y='depth',
             c='cplotvar',
+            hover_cols=['Value'],
             )
     return points
 
@@ -245,64 +254,119 @@ global x_min_global
 global x_max_global
 x_min_global, x_max_global = x_range
 
+
+
 class GliderExplorer(param.Parameterized):
 
     pick_variable = param.ObjectSelector(
         default='temperature', objects=[
         'temperature', 'salinity', 'potential_density',
-        'chlorophyll','oxygen_concentration'])
+        'chlorophyll','oxygen_concentration', 'cdom', 'backscatter_scaled'],
+        label='variable', doc='Variable presented as colormesh')
     pick_basin = param.ObjectSelector(
         default='Bornholm Basin', objects=[
         'Bornholm Basin', 'Eastern Gotland',
         'Western Gotland', 'Skagerrak, Kattegat',
-        'Åland Sea']
+        'Åland Sea'], label='SAMBA observatory'
     )
     pick_cnorm = param.ObjectSelector(
-        default='linear', objects=['linear', 'eq_hist'])
+        default='linear', objects=['linear', 'eq_hist', 'log'], doc='colorbar transformations', label='cbar scale')
     pick_aggregation = param.ObjectSelector(
-        default='mean', objects=['mean', 'std', 'var'])
+        default='mean', objects=['mean', 'std', 'var'], label='aggregation',
+        doc='choose method to aggregate different values that fall into one bin')
     pick_mld = param.Boolean(
-        default=False)
-    #button_inflow = pn.widgets.Button(name='Tell me about inflows', button_type='primary')
+        default=False, label='MLD', doc='mixed layer depth')
+    #button_inflow = param..Button(name='Tell me about inflows', icon='caret-right', button_type='primary')
+    # create a button that when pushed triggers 'button'
+    button_inflow = param.Action(lambda x: x.param.trigger('button_inflow'), label='Show me an inflow!')
 
-    #@param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
+    dynmap = None
+    x_range=(x_min_global,
+             x_max_global)
+    range_stream = RangeX(x_range=x_range)
+    annotations = []
+    about = """\
+    # About
+    This is designed to visualize data from the Voice of the Ocean SAMBA observatories. For additional datasets, visit observations.voiceoftheocean.org.
+    """
+    markdown = pn.pane.Markdown(about)
 
+    @param.depends('button_inflow', watch=True)
+    def execute_event(self):
+        #print('event triggered')
+        #self.pick_variable = 'salinity'
+        #print('event:variable changed')
+        #time.sleep(5)
+        #self.pick_variable = 'temperature'
+        #print('event:variable changed')
+
+        self.markdown.object = """\
+        # Baltic Inflows
+        Baltic Inflows are transporting salt and oxygen into the depth of the Baltic Sea.
+        """
+
+        global x_min_global
+        global x_max_global
+        x_min_global = np.datetime64('2023-12-01')
+        x_max_global = np.datetime64('2023-12-14')
+        #self.pick_variable = 'temperature'
+        print('event:plot reloaded')
+        #hv.Labels([np.datetime64('2023-12-07')], [20], [1]).opts(
+        #    opts.Labels(bgcolor='black',
+            #color='Values',
+            #fig_size=200,
+            # padding=0.05,
+        #    size=8))
+        text_annotation = hv.Text(
+            x=np.datetime64('2023-12-07'),
+            y=20, text='Look at this cool inflow!',
+            fontsize=10,
+            #params={background:'#00ff00'},
+            )
+        self.annotations.append(text_annotation)
+        self.pick_variable = 'oxygen_concentration'
+                #).opts(**ropts).opts(text_opts)
+
+        return self.dynmap*text_annotation
+
+
+    @param.depends('pick_cnorm','pick_variable', 'pick_basin', 'pick_aggregation', 'pick_mld') # outcommenting this means just depend on all, redraw always
     def create_dynmap(self):
+
         global currentobject
         currentobject = self
         t1 = time.perf_counter()
-        x_range=(x_min_global,
-                 x_max_global)
-
-        range_stream = RangeX(x_range=x_range)
         pick_cnorm='linear'
 
         dmap_raster = hv.DynamicMap(
             get_xsection_raster,
-            streams=[range_stream],
+            streams=[self.range_stream],
             #cache_size=1,)
         )
+        self.dynmap_raster = dmap_raster
 
         if self.pick_mld:
-            dmap_mld = hv.DynamicMap(get_xsection_mld, streams=[range_stream], cache_size=1)
+            dmap_mld = hv.DynamicMap(get_xsection_mld, streams=[self.range_stream], cache_size=1)
         if self.pick_aggregation=='mean':
             means = dsh.mean('cplotvar')
         if self.pick_aggregation=='std':
             means = dsh.std('cplotvar')
         if self.pick_aggregation=='var':
             means = dsh.var('cplotvar')
+
         dmap_rasterized = rasterize(dmap_raster,
                     aggregator=means,
-                    x_sampling=8.64e13/24,
-                    y_sampling=.5,
+                    #x_sampling=8.64e13/24,
+                    y_sampling=.2,
+                    #invert_yaxis=True,
                     ).opts(
             #alpha=0.2,
-            invert_yaxis=True,
             colorbar=True,
             cmap=dictionaries.cmap_dict[self.pick_variable],#,cmap
             toolbar='above',
-            tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],
+            tools=['xwheel_zoom', 'reset', 'xpan', 'ywheel_zoom', 'ypan'],#, 'hover'],
             default_tools=[],
+            ylim=(0,90),
             #responsive=True,
             width=800,
             height=400,
@@ -314,11 +378,9 @@ class GliderExplorer(param.Parameterized):
         dmap = hv.DynamicMap(get_xsection, cache_size=1)
         t2 = time.perf_counter()
 
-        """
-        THIS PART IS WORKING PERFECTLY FINE, should reactivate itm but check zoom ranges on variable change...
         dmap_points = hv.DynamicMap(
             get_xsection_points,
-            streams=[range_stream],
+            streams=[self.range_stream],
             cache_size=1
             )
         dmap_points = spread(datashade(
@@ -334,15 +396,20 @@ class GliderExplorer(param.Parameterized):
                 height=400,
                 active_tools=['xpan', 'xwheel_zoom'],
                 bgcolor="dimgrey",)
-        """
-
 
         if self.pick_mld:
             #return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
-            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap*dmap_mld
+            dynmap = (dmap_points*dmap_rasterized.opts(xlim=(x_min_global, x_max_global)))*dmap*dmap_mld.opts(ylim=(-8,None))
+            self.dynmap = dynmap
         else:
+            dynmap = ((dmap_points*dmap_rasterized.opts(xlim=(x_min_global, x_max_global)))*dmap).opts(ylim=(-8,None))
             #return (dmap_rasterized*dmap_points).opts(xlim=(x_min_global, x_max_global))*dmap
-            return (dmap_rasterized).opts(xlim=(x_min_global, x_max_global))*dmap
+            self.dynmap = dynmap
+
+        for annotation in self.annotations:
+            print('insert text annotations defined in events')
+            dynmap = dynmap*annotation
+        return dynmap
         #return dmap*dmap_mld
 
 
@@ -351,22 +418,17 @@ glider_explorer=GliderExplorer()
 # usefull to create secondary plot, but not fully indepentently working yet:
 # glider_explorer2=GliderExplorer()
 
-
 pn.Column(
     pn.Row(
         glider_explorer.param,
-        glider_explorer.create_dynmap),).show(
+        glider_explorer.create_dynmap),
+    pn.Row(glider_explorer.markdown)).show(
     title='VOTO SAMBA data',
     websocket_origin='*',
     port=12345,
     #admin=True,
     #profiler=True
     )
-
-#pn.Column(cnorm_widget,variable_widget, dmap_rasterized_bound).show(
-#    title='VOTO SAMBA data',
-#    websocket_origin='*',
-#    port=12345)
 
 """
 Future development ideas:

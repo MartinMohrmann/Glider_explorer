@@ -4,6 +4,7 @@ import pathlib
 import xarray as xr
 import pandas as pd
 from erddapy import ERDDAP
+import ast
 # from tqdm.notebook import tqdm
 # from argopy import DataFetcher as ArgoDataFetcher
 
@@ -214,13 +215,15 @@ def _preprocess(ds):
     #    return ds
 
 
-def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=False, delayed_only=False,
+def download_glider_dataset(dataset_ids, metadata, variables=(), constraints={}, nrt_only=False, delayed_only=False,
                             cache_datasets=True, adcp=False):
     """
     Download datasets from the VOTO server using a supplied list of dataset IDs.
     dataset_ids: list of datasetIDs present on the VOTO ERDDAP
     variables: data variables to download. If left empty, will download all variables
     """
+    # import pdb; pdb.set_trace();
+
     if nrt_only and delayed_only:
         raise ValueError("Cannot set both nrt_only and delayed_only")
     if nrt_only:
@@ -242,14 +245,23 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
 
     e = init_erddap()
     # Specify variables of interest if supplied
-    if variables:
-        e.variables = variables
+
     if constraints:
         e.constraints = constraints
 
     # Download each dataset as xarray
     glider_datasets = {}
     for ds_name in ids_to_download:
+        if variables:
+            # e.variables = variables
+            if ds_name[0:3]=='nrt':
+                variables_in_ds = set(ast.literal_eval(metadata.loc[ds_name].variables))
+            else:
+                variables_in_ds = set(ast.literal_eval(metadata.loc[ds_name.replace('delayed', 'nrt')].variables))
+            variables_requested = variables
+            variables_to_download = variables_in_ds.intersection(variables_requested)
+            e.variables = variables_to_download
+            # otherwise, e.variables remains unspecified and all variables are downloaded.
         if cache_datasets:# and "delayed" in ds_name: # and "delayed" in ds_name
             e.dataset_id = ds_name
             request = e.get_download_url()
@@ -278,6 +290,7 @@ def download_glider_dataset(dataset_ids, variables=(), constraints={}, nrt_only=
         else:
             print(f"Downloading {ds_name}")
             e.dataset_id = ds_name
+            #e.variables =
             try:
                 ds = e.to_xarray(requests_kwargs=dict(timeout=300))
             except BaseException as ex:
