@@ -6,6 +6,7 @@ cmap_dict = dict(
     temperature=cmocean.cm.thermal,
     salinity=cmocean.cm.haline,
     backscatter=cmocean.cm.turbid,
+    backscatter_scaled=cmocean.cm.turbid,
     cdom=cmocean.cm.matter,
     fdom=cmocean.cm.haline,
     chlorophyll=cmocean.cm.algae,

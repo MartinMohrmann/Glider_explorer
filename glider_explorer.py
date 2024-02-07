@@ -18,6 +18,7 @@ import panel as pn
 import param
 import datashader.transfer_functions as tf
 import time
+import plotly.express as px
 
 from download_glider_data import utils as dutils
 import utils
@@ -413,7 +414,38 @@ class GliderExplorer(param.Parameterized):
         #return dmap*dmap_mld
 
 
+class MetaExplorer(param.Parameterized):
+    pick_serial = param.ObjectSelector(
+        default='glider_serial', objects=[
+        'glider_serial', 'optics_serial', 'altimeter_serial',
+        'irradiance_serial','project',],
+        label='Equipment Ser. No.', doc='Track equipment or gliders')
+
+    @param.depends('pick_serial') # outcommenting this means just depend on all, redraw always
+    def create_timeline(self):
+        dfm = metadata.sort_values('basin')#px.data.iris() # replace with your own data source
+        #fig = make_subplots(rows=1, cols=1,
+        #                shared_xaxes=True,
+        #                vertical_spacing=0.02)
+        dims=self.pick_serial
+        timeline_fig = px.timeline(dfm,
+            x_start="time_coverage_start (UTC)",
+            x_end="time_coverage_end (UTC)",
+            y="basin",
+            hover_name=dfm.index,
+            #color_discrete_map=['lightgrey'],
+            color_discrete_map={
+            0: "lightgrey", "nan":"grey"},
+            hover_data=['ctd_serial', 'optics_serial'],
+            color=dims,
+            pattern_shape=dims,
+                    )
+        return timeline_fig
+
+
 glider_explorer=GliderExplorer()
+meta_explorer=MetaExplorer()
+
 
 # usefull to create secondary plot, but not fully indepentently working yet:
 # glider_explorer2=GliderExplorer()
@@ -422,7 +454,10 @@ pn.Column(
     pn.Row(
         glider_explorer.param,
         glider_explorer.create_dynmap),
-    pn.Row(glider_explorer.markdown)).show(
+    pn.Row(glider_explorer.markdown),
+    pn.Row(
+        meta_explorer.param,
+        meta_explorer.create_timeline)).show(
     title='VOTO SAMBA data',
     websocket_origin='*',
     port=12345,
