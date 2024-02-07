@@ -40,8 +40,8 @@ all_metadata, _ = utils.load_metadata()
 
 ###### filter metadata to prepare download ##############
 metadata, all_datasets = utils.filter_metadata()
-"""
 metadata = metadata.drop(['nrt_SEA067_M15', 'nrt_SEA079_M14', 'nrt_SEA061_M63'], errors='ignore') #!!!!!!!!!!!!!!!!!!!! # temporary data inconsistency
+"""
 all_dataset_ids = utils.add_delayed_dataset_ids(metadata, all_datasets) # hacky
 
 ###### download actual data ##############################
@@ -493,10 +493,10 @@ def create_app_instance():
 
 app = create_app_instance()
 app.servable()
-    #port=12345,
-    #websocket_origin='*',
-    #title='VOTO SAMBA data',
-    #threaded=True)
+#    port=12345,
+#    websocket_origin='*',
+#    title='VOTO SAMBA data',
+#    threaded=True)
 
 """
 pn.serve(
